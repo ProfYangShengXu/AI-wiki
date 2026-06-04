@@ -41,3 +41,28 @@ venv/
 
 # LTspice installer
 ltspice_installer.msi
+
+# Database files
+*.sqlite3
+*.db
+
+# Compiled files
+*.pyo
+*.pyd
+
+# Coverage
+.coverage
+htmlcov/
+
+# Mypy
+.mypy_cache/
+
+# Swap / backup
+*.bak
+*.swp
+
+# Node
+node_modules/
+
+# Editor swap files
+*~
