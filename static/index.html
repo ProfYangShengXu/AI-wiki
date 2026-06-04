@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>StudyWiki-Agent</title>
+<link rel="stylesheet" href="/static/vendor/tailwind.min.css" onerror="this.onerror=null;this.href='https://cdn.tailwindcss.com'">
+<link rel="stylesheet" href="/static/vendor/daisyui.min.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/daisyui@4.4.0/dist/full.min.css'">
+<script defer src="/static/vendor/alpinejs.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/alpinejs@3.13.0/dist/cdn.min.js'"></script>
+<script defer src="/static/vendor/marked.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js'"></script>
+<style>html,body{height:100%;margin:0}#app{display:flex;flex-direction:column;height:100vh}.main-content{display:flex;flex:1;overflow:hidden}.sidebar{width:280px;overflow-y:auto;flex-shrink:0;font-size:13px}.card-area{flex:1;overflow-y:auto}.chat-panel{border-top:1px solid #e5e7eb}.chat-messages{max-height:200px;overflow-y:auto}.card-link{color:#2563eb;text-decoration:underline;text-decoration-style:dotted;font-weight:500;cursor:pointer}.card-link:hover{color:#1d4ed8;background:#eff6ff}.hidden-input{display:none}.tree-node{cursor:pointer;padding:2px 6px;display:flex;gap:4px;align-items:center;border-radius:4px}.tree-node:hover{background:#f3f4f6}.tree-node.active{background:#dbeafe;color:#1d4ed8}</style>
+</head>
+<body>
+<div id="app" x-data="app()">
+<header class="navbar bg-base-200 border-b px-2 py-0 min-h-0" style="height:36px">
+<div class="flex-1 flex items-center gap-1">
+<button class="btn btn-ghost btn-xs btn-square" @click="sidebar=!sidebar">-</button>
+<span class="font-bold text-sm">SWA v0.3</span>
+<label class="btn btn-outline btn-primary btn-xs" :class="{loading:up}">
+Upload<input type="file" class="hidden-input" accept=".pdf,.docx,.doc,.md,.txt" @change="upFile($event)"></label>
+</div>
+<div class="flex-none flex items-center gap-1">
+<input class="input input-bordered input-xs w-32" placeholder="Search" x-model="q" @input.debounce.500ms="search()">
+<button class="btn btn-ghost btn-xs" @click="log=!log">Log</button>
+</div>
+</header>
+
+<div class="main-content">
+<aside class="sidebar border-r bg-base-100 p-2" x-show="sidebar" x-transition>
+<div class="text-xs font-semibold text-gray-500 mb-1">Categories</div>
+<div x-show="load" class="text-xs text-gray-400 p-2">Loading...</div>
+<template x-for="c in cats" :key="c.id">
+<div class="tree-node text-sm" @click="selCat(c)" :class="{active:cid===c.id}">
+<span x-text="c.n"></span><span class="text-xs text-gray-400">(</span><span class="text-xs text-gray-400" x-text="c.t"></span><span class="text-xs text-gray-400">)</span>
+</div>
+</template>
+<div x-show="!load&&!cats.length" class="text-xs text-gray-400 p-2">No cards yet.</div>
+</aside>
+
+<main class="card-area p-4">
+<template x-if="card"><div class="card bg-white shadow border"><div class="card-body p-4">
+<h2 class="text-xl font-bold" x-text="card.title"></h2>
+<div class="badge badge-outline badge-sm mt-1" x-text="card.category"></div>
+<div class="divider my-2"></div>
+<div class="prose text-sm max-w-none" x-html="link(card.content)" @click.prevent="cardLink($event)"></div>
+<template x-if="card.examples?.length"><div class="mt-3"><h3 class="font-semibold text-sm mb-1">Examples</h3><template x-for="e in card.examples"><div class="text-sm ml-2 mb-1" x-html="link(e)" @click.prevent="cardLink($event)"></div></template></div></template>
+<template x-if="card.questions?.length"><div class="mt-3"><h3 class="font-semibold text-sm mb-1">Questions</h3><template x-for="q in card.questions"><div class="text-sm ml-2 mb-1" x-html="link(q)" @click.prevent="cardLink($event)"></div></template></div></template>
+<div class="text-xs text-gray-400 mt-3" x-text="card.source_file+(card.source_page?' p.'+card.source_page:'')"></div>
+</div></div></template>
+<div x-show="!card" class="flex items-center justify-center h-full text-gray-400">Select a category on the left</div>
+</main>
+</div>
+
+<div class="chat-panel bg-base-200">
+<button class="btn btn-ghost btn-xs w-full rounded-none" @click="chat=!chat"><span x-text="chat?'-':'+'"></span> Chat <span x-show="cw" class="loading loading-dots loading-xs"></span></button>
+<div x-show="chat" x-transition class="px-3 pb-2"><div class="chat-messages mb-2 space-y-1" x-ref="chatBox"><template x-for="(m,i) in msgs" :key="i"><div class="chat" :class="m.u?'chat-end':'chat-start'"><div class="chat-bubble text-xs" :class="m.u?'chat-bubble-primary':''" x-html="md(m.t)"></div></div></template></div>
+<div class="flex gap-1"><input class="input input-bordered input-xs flex-1" x-model="input" @keydown.enter="send()" :disabled="cw"><button class="btn btn-primary btn-xs" @click="send()" :disabled="cw">Send</button></div></div>
+</div>
+
+<div x-show="log" class="fixed bottom-0 right-0 w-1/2 h-1/2 bg-gray-800 text-green-300 z-50 flex flex-col shadow-2xl" x-transition>
+<div class="flex justify-between px-2 py-1 bg-gray-700 text-xs font-medium"><span>Logs</span><button class="btn btn-ghost btn-xs" @click="log=false">X</button></div>
+<div class="flex-1 overflow-y-auto p-1 text-xs font-mono" x-ref="logBox"><template x-for="l in logs" :key="l.time"><div :class="{'text-red-400':l.level==='ERROR'}"><span class="opacity-60" x-text="l.time?.slice(11,19)"></span> <span x-text="l.level"></span> <span x-text="l.message"></span></div></template></div>
+</div>
+</div>
+
+<script>
+function app(){return{
+sidebar:true,chat:false,log:false,logs:[],load:true,cid:null,
+cats:[],card:null,q:"",
+msgs:[{u:false,t:"Hello! Ask me anything."}],input:"",cw:false,
+up:false,status:"",
+ws:null,titles:{},aliases:[],
+
+init(){this.fetchLogs();setInterval(()=>this.fetchLogs(),3000);this.wsConn();(async()=>{
+try{
+const r=await fetch('/api/categories');const d=await r.json();
+if(d.status!=='success')return;
+let id=0;
+for(const c of d.data.categories||[]){
+let cc=0;
+try{const r2=await fetch('/api/cards?category='+encodeURIComponent(c)+'&limit=200');const d2=await r2.json();
+if(d2.data?.cards){cc=d2.data.cards.length;for(const ca of d2.data.cards){this.titles[ca.id]=ca.title;for(const n of [ca.title,...(ca.aliases||[])]){if(n&&n.length>=2)this.aliases.push({id:ca.id,name:n})}}}}
+catch(e){}
+this.cats.push({id:++id,n:c,t:cc,data:null});
+}
+}catch(e){console.error(e)}
+this.load=false;
+})()},
+
+fetchLogs(){fetch('/api/logs?n=100').then(r=>r.json()).then(d=>{if(d.status==='success')this.logs=d.data}).catch(()=>{})},
+
+wsConn(){if(this.ws&&this.ws.readyState===WebSocket.OPEN)return;
+try{this.ws=new WebSocket('ws://'+location.host+'/ws/chat');
+this.ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='response'){this.msgs.push({u:false,t:m.content});this.cw=false}}catch(e){}};
+this.ws.onclose=()=>setTimeout(()=>this.wsConn(),3000)}catch(e){setTimeout(()=>this.wsConn(),3000)}},
+
+send(){const t=this.input.trim();if(!t||this.cw)return;this.msgs.push({u:true,t:t});this.input='';this.cw=true;
+if(this.ws&&this.ws.readyState===WebSocket.OPEN)this.ws.send(JSON.stringify({type:'message',content:t}))},
+
+async selCat(c){this.cid=c.id;
+try{const r=await fetch('/api/cards?category='+encodeURIComponent(c.n)+'&limit=1');const d=await r.json();
+if(d.data?.cards?.length)this.card=d.data.cards[0]}catch(e){}},
+
+async search(){const q=this.q.trim();if(q.length<2)return;
+try{const r=await fetch('/api/cards/search?q='+encodeURIComponent(q));const d=await r.json();
+if(d.data?.cards?.length)this.card=d.data.cards[0]}catch(e){}},
+
+async upFile(e){const f=e.target.files[0];if(!f)return;e.target.value='';this.up=true;this.status='Uploading '+f.name+'...';
+const fd=new FormData();fd.append('file',f);
+try{const r=await fetch('/api/upload',{method:'POST',body:fd});const d=await r.json();
+if(d.status==='success'){this.status='Imported '+d.data.imported+' cards';if(d.data.cards?.length)this.card=d.data.cards[0];}}catch(e){this.status='Error'}
+this.up=false;setTimeout(()=>{this.status='';location.reload()},3000)},
+
+md(t){if(!t)return'';try{return marked.parse(t)}catch(e){return t.replace(/\n/g,'<br>')}},
+
+link(t){if(!t)return'';let h=this.md(t);
+for(const{id,name}of[...this.aliases].sort((a,b)=>b.name.length-a.name.length)){
+if(!name||name.length<2)continue;
+const re=new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+h=h.replace(re,(m,o,s)=>{if(s.lastIndexOf('<',o)>s.lastIndexOf('>',o))return m;return'<a class="card-link" href="#" data-cid="'+id+'">'+m+'</a>'});
+}
+return h},
+
+cardLink(e){const a=e.target.closest('.card-link');if(!a)return;const id=a.dataset.cid;
+fetch('/api/cards/'+id).then(r=>r.json()).then(d=>{if(d.status==='success')this.card=d.data}).catch(()=>{})}
+};}
+</script>
+</body>
+</html>

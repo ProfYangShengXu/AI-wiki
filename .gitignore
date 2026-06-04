@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.pyc
+
+# ChromaDB persistence
+chroma_db/
+
+# Upload files
+uploads/*
+!uploads/.gitkeep
+
+# Frontend vendor (CDN downloads)
+static/vendor/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test
+.pytest_cache/
+
+# Python virtual env
+.venv/
+venv/
+
+# LTspice installer
+ltspice_installer.msi

@@ -1,0 +1,435 @@
+$ python -m pytest tests/ -v --tb=short 2>&1
+[exit 1]
+============================= test session starts =============================
+platform win32 -- Python 3.12.4, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\45140\AppData\Local\Programs\Python\Python312\python.EXE
+cachedir: .pytest_cache
+rootdir: C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.8.7, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 75 items
+
+tests/test_agent.py::TestParseLlmJson::test_normal_json_array PASSED     [  1%]
+tests/test_agent.py::TestParseLlmJson::test_json_with_codeblock PASSED   [  2%]
+tests/test_agent.py::TestParseLlmJson::test_json_with_triple_backtick_no_lang PASSED [  4%]
+tests/test_agent.py::TestParseLlmJson::test_single_quotes PASSED         [  5%]
+tests/test_agent.py::TestParseLlmJson::test_trailing_comma PASSED        [  6%]
+tests/test_agent.py::TestParseLlmJson::test_empty_array PASSED           [  8%]
+tests/test_agent.py::TestParseLlmJson::test_invalid_json PASSED          [  9%]
+tests/test_agent.py::TestParseLlmJson::test_empty_string PASSED          [ 10%]
+tests/test_agent.py::TestParseLlmJson::test_none_input FAILED            [ 12%]
+tests/test_agent.py::TestParseLlmJson::test_json_object_not_array FAILED [ 13%]
+tests/test_agent.py::TestParseLlmJson::test_codeblock_with_extra_text PASSED [ 14%]
+tests/test_agent.py::TestParseLlmJson::test_multiple_codeblocks PASSED   [ 16%]
+tests/test_agent.py::TestExtractRange::test_per_page_extraction PASSED   [ 17%]
+tests/test_agent.py::TestExtractRange::test_aggregated_extraction PASSED [ 18%]
+tests/test_agent.py::TestExtractRange::test_dedup_by_title PASSED        [ 20%]
+tests/test_agent.py::TestExtractRange::test_llm_failure_fallback PASSED  [ 21%]
+tests/test_agent.py::TestQaWorkers::test_qa_search_worker_empty PASSED   [ 22%]
+tests/test_agent.py::TestQaWorkers::test_qa_answer_with_cards PASSED     [ 24%]
+tests/test_database.py::test_create_and_get_card PASSED                  [ 25%]
+tests/test_database.py::test_update_card PASSED                          [ 26%]
+tests/test_database.py::test_delete_card PASSED                          [ 28%]
+tests/test_database.py::test_delete_nonexistent PASSED                   [ 29%]
+tests/test_database.py::test_update_nonexistent PASSED                   [ 30%]
+tests/test_database.py::test_list_cards_empty PASSED                     [ 32%]
+tests/test_database.py::test_list_cards_with_data PASSED                 [ 33%]
+tests/test_database.py::test_get_categories PASSED                       [ 34%]
+tests/test_database.py::test_batch_import PASSED                         [ 36%]
+tests/test_database.py::test_create_card_with_examples_and_questions PASSED [ 37%]
+tests/test_database.py::test_association_detection PASSED                [ 38%]
+tests/test_models.py::TestKnowledgeCard::test_minimal_card PASSED        [ 40%]
+tests/test_models.py::TestKnowledgeCard::test_full_card PASSED           [ 41%]
+tests/test_models.py::TestKnowledgeCard::test_embedding_text PASSED      [ 42%]
+tests/test_models.py::TestKnowledgeCard::test_empty_title_fails PASSED   [ 44%]
+tests/test_models.py::TestCardCreate::test_minimal PASSED                [ 45%]
+tests/test_models.py::TestCardCreate::test_title_too_long PASSED         [ 46%]
+tests/test_models.py::TestCardCreate::test_full PASSED                   [ 48%]
+tests/test_models.py::TestCardUpdate::test_empty_update PASSED           [ 49%]
+tests/test_models.py::TestCardUpdate::test_partial_update PASSED         [ 50%]
+tests/test_models.py::TestApiSchemas::test_api_response_success PASSED   [ 52%]
+tests/test_models.py::TestApiSchemas::test_api_response_error PASSED     [ 53%]
+tests/test_models.py::TestApiSchemas::test_api_response_invalid_status PASSED [ 54%]
+tests/test_models.py::TestApiSchemas::test_import_result PASSED          [ 56%]
+tests/test_models.py::TestApiSchemas::test_import_result_with_data PASSED [ 57%]
+tests/test_models.py::TestWSMessage::test_valid_types PASSED             [ 58%]
+tests/test_models.py::TestWSMessage::test_invalid_type PASSED            [ 60%]
+tests/test_routes.py::TestRoot::test_root_returns_html PASSED            [ 61%]
+tests/test_routes.py::TestHealth::test_health FAILED                     [ 62%]
+tests/test_routes.py::TestCardsAPI::test_list_cards_empty FAILED         [ 64%]
+tests/test_routes.py::TestCardsAPI::test_create_and_get_card FAILED      [ 65%]
+tests/test_routes.py::TestCardsAPI::test_search FAILED                   [ 66%]
+tests/test_routes.py::TestCategoriesAPI::test_categories FAILED          [ 68%]
+tests/test_routes.py::TestUploadAPI::test_upload_text_file PASSED        [ 69%]
+tests/test_routes.py::TestUploadAPI::test_upload_invalid_extension PASSED [ 70%]
+tests/test_routes.py::TestErrorHandling::test_404 PASSED                 [ 72%]
+tests/test_routes.py::TestErrorHandling::test_405 PASSED                 [ 73%]
+tests/test_routes.py::TestErrorHandling::test_invalid_card_id FAILED     [ 74%]
+tests/test_tools.py::TestDocumentParsing::test_parse_markdown PASSED     [ 76%]
+tests/test_tools.py::TestDocumentParsing::test_parse_text PASSED         [ 77%]
+tests/test_tools.py::TestDocumentParsing::test_parse_empty_markdown PASSED [ 78%]
+tests/test_tools.py::TestDocumentParsing::test_unsupported_extension PASSED [ 80%]
+tests/test_tools.py::TestDocumentParsing::test_nonexistent_file PASSED   [ 81%]
+tests/test_tools.py::TestChunkText::test_short_text PASSED               [ 82%]
+tests/test_tools.py::TestChunkText::test_long_text PASSED                [ 84%]
+tests/test_tools.py::TestChunkText::test_exact_boundary PASSED           [ 85%]
+tests/test_tools.py::TestChunkText::test_overlap PASSED                  [ 86%]
+tests/test_tools_ext.py::TestDocumentScanner::test_skip_blank_pages FAILED [ 88%]
+tests/test_tools_ext.py::TestDocumentScanner::test_skip_cover_toc PASSED [ 89%]
+tests/test_tools_ext.py::TestDocumentScanner::test_empty_document PASSED [ 90%]
+tests/test_tools_ext.py::TestDocumentScanner::test_llm_scan_failure_graceful PASSED [ 92%]
+tests/test_tools_ext.py::TestChunkTextExtended::test_empty_text PASSED   [ 93%]
+tests/test_tools_ext.py::TestChunkTextExtended::test_exact_max_chars PASSED [ 94%]
+tests/test_tools_ext.py::TestChunkTextExtended::test_large_text PASSED   [ 96%]
+tests/test_tools_ext.py::TestChunkTextExtended::test_overlap_accuracy PASSED [ 97%]
+tests/test_tools_ext.py::TestScanResult::test_default_values PASSED      [ 98%]
+tests/test_tools_ext.py::TestScanResult::test_with_data PASSED           [100%]
+
+================================== FAILURES ===================================
+______________________ TestParseLlmJson.test_none_input _______________________
+tests\test_agent.py:56: in test_none_input
+    result = _parse_llm_json(None)
+             ^^^^^^^^^^^^^^^^^^^^^
+bobanana\agent.py:73: in _parse_llm_json
+    for m in [re.search(r"```(?:json)?\s*([\s\S]*?)```", text),
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\re\__init__.py:177: in search
+    return _compile(pattern, flags).search(string)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: expected string or bytes-like object, got 'NoneType'
+_________________ TestParseLlmJson.test_json_object_not_array _________________
+tests\test_agent.py:63: in test_json_object_not_array
+    assert result is None  # 期望数组
+    ^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert {'content': 'test', 'title': 'CPU'} is None
+___________________________ TestHealth.test_health ____________________________
+tests\test_routes.py:46: in test_health
+    assert resp.status_code == 200
+E   assert 503 == 200
+E    +  where 503 = <Response [503 Service Unavailable]>.status_code
+_____________________ TestCardsAPI.test_list_cards_empty ______________________
+tests\test_routes.py:54: in test_list_cards_empty
+    resp = client.get("/api/cards")
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:473: in get
+    return super().get(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1053: in get
+    return self.request(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:445: in request
+    return super().request(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:914: in send
+    response = self._send_handling_auth(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:348: in handle_request
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:345: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\anyio\from_thread.py:334: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:401: in __get_result
+    raise self._exception
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\anyio\from_thread.py:259: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:1159: in __call__
+    await super().__call__(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py:88: in __call__
+    await self.app(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\middleware\asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py:680: in app
+    await route.handle(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py:276: in handle
+    await self.app(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:134: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:120: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:674: in app
+    raw_response = await run_endpoint_function(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:328: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+bobanana\routes\cards.py:19: in list_cards
+    cards, total = await card_service.list_cards(category, page, limit)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+bobanana\service\card_service.py:45: in list_cards
+    return db_manager.list_cards(category, page, limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+bobanana\database.py:210: in list_cards
+    result = self.collection.get(where=where)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\models\Collection.py:161: in get
+    get_results = self._client._get(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\rust.py:440: in _get
+    rust_response = self.bindings.get(
+E   chromadb.errors.NotFoundError: Collection [4c180983-aa76-471f-86db-d5c7f14ed216] does not exist.
+------------------------------ Captured log call ------------------------------
+ERROR    bobanana.app:app.py:91 未处理异常: Collection [4c180983-aa76-471f-86db-d5c7f14ed216] does not exist.
+Traceback (most recent call last):
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0\bobanana\routes\cards.py", line 19, in list_cards
+    cards, total = await card_service.list_cards(category, page, limit)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0\bobanana\service\card_service.py", line 45, in list_cards
+    return db_manager.list_cards(category, page, limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0\bobanana\database.py", line 210, in list_cards
+    result = self.collection.get(where=where)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\models\Collection.py", line 161, in get
+    get_results = self._client._get(
+                  ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\rust.py", line 440, in _get
+    rust_response = self.bindings.get(
+                    ^^^^^^^^^^^^^^^^^^
+chromadb.errors.NotFoundError: Collection [4c180983-aa76-471f-86db-d5c7f14ed216] does not exist.
+____________________ TestCardsAPI.test_create_and_get_card ____________________
+tests\test_routes.py:62: in test_create_and_get_card
+    resp = client.post("/api/cards", json={
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:546: in post
+    return super().post(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1144: in post
+    return self.request(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:445: in request
+    return super().request(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:914: in send
+    response = self._send_handling_auth(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:348: in handle_request
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:345: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\anyio\from_thread.py:334: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:401: in __get_result
+    raise self._exception
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\anyio\from_thread.py:259: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:1159: in __call__
+    await super().__call__(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py:88: in __call__
+    await self.app(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\middleware\asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py:680: in app
+    await route.handle(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py:276: in handle
+    await self.app(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:134: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:120: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:674: in app
+    raw_response = await run_endpoint_function(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py:328: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+bobanana\routes\cards.py:54: in create_card
+    card = await card_service.create_card(data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+bobanana\service\card_service.py:82: in create_card
+    card.id = db_manager.add_card(card, embedding)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+bobanana\database.py:141: in add_card
+    self.collection.add(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\models\Collection.py:118: in add
+    self._client._add(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\rust.py:484: in _add
+    return self.bindings.add(
+E   chromadb.errors.NotFoundError: Error getting collection: Collection [4c180983-aa76-471f-86db-d5c7f14ed216] does not exist.
+------------------------------ Captured log call ------------------------------
+ERROR    bobanana.app:app.py:91 未处理异常: Error getting collection: Collection [4c180983-aa76-471f-86db-d5c7f14ed216] does not exist.
+Traceback (most recent call last):
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0\bobanana\routes\cards.py", line 54, in create_card
+    card = await card_service.create_card(data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0\bobanana\service\card_service.py", line 82, in create_card
+    card.id = db_manager.add_card(card, embedding)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0\bobanana\database.py", line 141, in add_card
+    self.collection.add(
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\models\Collection.py", line 118, in add
+    self._client._add(
+  File "C:\Users\45140\AppData\Local\Programs\Python\Python312\Lib\site-packages\chromadb\api\rust.py", line 484, in _add
+    return self.bindings.add(
+           ^^^^^^^^^^^^^^^^^^
+chromadb.errors.NotFoundError: Error getting collection: Collection [4c180983-aa76-471f-86db-d5c7f14ed216] does not exist.
+__________________________ TestCardsAPI.test_search ___________________________
+tests\test_routes.py:98: in test_search
+    client.post("/api/cards", json={
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:546: in post
+    return super().post(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1144: in post
+    return self.request(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:445: in request
+    return super().request(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:914: in send
+    response = self._send_handling_auth(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:348: in handle_request
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\testclient.py:345: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\anyio\from_thread.py:334: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:401: in __get_result
+    raise self._exception
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\anyio\from_thread.py:259: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:1159: in __call__
+    await super().__call__(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\star
+
+[… truncated 29205 chars …]
