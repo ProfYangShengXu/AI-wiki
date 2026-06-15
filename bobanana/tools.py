@@ -120,6 +120,13 @@ def _ocr_page(page) -> str:
     """对 PyMuPDF 页面做 OCR。失败时返回空字符串。"""
     try:
         import pytesseract
+        # 设置 tesseract 路径（不在 PATH 时的 fallback）
+        import os as _os
+        for _p in [r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                   r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe']:
+            if _os.path.exists(_p):
+                pytesseract.pytesseract.tesseract_cmd = _p
+                break
         from PIL import Image
         import io
         pix = page.get_pixmap(dpi=300)
