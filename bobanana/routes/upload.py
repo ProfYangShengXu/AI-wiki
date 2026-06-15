@@ -1,7 +1,8 @@
-"""文件上传路由 — 接收文件后触发 Agent 导入工作流。"""
+"""文件上传路由 — 接收文件后立即返回，后台异步处理。"""
 
 import asyncio
 import logging
+import uuid
 from pathlib import Path
 
 import aiofiles
@@ -17,23 +18,32 @@ router = APIRouter(prefix="/api/upload", tags=["upload"])
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".md", ".txt"}
 
+# 后台任务状态
+_tasks: dict[str, dict] = {}
 
-def _run_import_sync(file_path: str, filename: str):
-    """在线程中同步运行导入工作流。"""
-    return run_import_workflow(file_path=file_path, filename=filename)
+
+def _run_import_sync(file_path: str, filename: str, task_id: str):
+    """在线程中同步运行导入工作流，更新进度。"""
+    try:
+        result = run_import_workflow(file_path=file_path, filename=filename)
+        _tasks[task_id] = {
+            "status": "done",
+            "message": f"成功 {len(result.success)} 张, 失败 {len(result.failed)} 张",
+            "imported": len(result.success),
+            "failed": len(result.failed),
+            "cards": [c.model_dump() if hasattr(c, 'model_dump') else c for c in result.success[:20]],
+        }
+    except Exception as e:
+        logger.error("导入失败: %s", e)
+        _tasks[task_id] = {"status": "error", "message": str(e)}
 
 
 @router.post("", response_model=ApiResponse)
 async def upload_file(file: UploadFile = File(...)):
-    # 校验文件类型
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不支持的文件类型: {ext}，允许: {', '.join(ALLOWED_EXTENSIONS)}",
-        )
+        raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
 
-    # 保存文件
     safe_name = file.filename.replace("..", "").replace("/", "").replace("\\", "")
     dest = UPLOAD_DIR / safe_name
     content = await file.read()
@@ -42,21 +52,24 @@ async def upload_file(file: UploadFile = File(...)):
 
     logger.info("文件已保存: %s (%d bytes)", safe_name, len(content))
 
-    # 在线程中运行 Agent 工作流，避免阻塞事件循环
+    # 创建任务 ID，立即返回
+    task_id = uuid.uuid4().hex[:12]
+    _tasks[task_id] = {"status": "processing", "message": "解析中..."}
+
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        None, _run_import_sync, str(dest), safe_name
-    )
+    loop.run_in_executor(None, _run_import_sync, str(dest), safe_name, task_id)
 
     return ApiResponse(
         status="success",
-        message=f"文件解析完成: 成功 {len(result.success)} 张, 失败 {len(result.failed)} 张",
-        data={
-            "filename": safe_name,
-            "size": len(content),
-            "imported": len(result.success),
-            "failed": len(result.failed),
-            "failed_details": result.failed[:10],
-            "cards": result.success[:20],
-        },
+        message="文件上传成功，后台解析中...",
+        data={"task_id": task_id, "filename": safe_name, "size": len(content)},
     )
+
+
+@router.get("/status/{task_id}", response_model=ApiResponse)
+async def upload_status(task_id: str):
+    """查询上传任务状态。"""
+    task = _tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return ApiResponse(status="success", data=task)
