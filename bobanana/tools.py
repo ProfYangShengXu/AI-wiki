@@ -318,7 +318,6 @@ class ScanResult:
         self.doc_type = doc_type
         self.skipped_pages = skipped_pages or []
         self.pages = pages or []
-        self.pages = pages or []
 
 
 class DocumentScanner:
@@ -421,13 +420,36 @@ class DocumentScanner:
         return valid_ranges, skipped
 
 
-def llm_invoke(system_prompt: str, user_prompt: str) -> str:
-    """调用 LLM，返回文本结果。"""
+def llm_invoke(system_prompt: str, user_prompt: str, timeout_sec: int = None) -> str:
+    """调用 LLM，返回文本结果。支持超时和重试。"""
+    import concurrent.futures
     from langchain_core.messages import SystemMessage, HumanMessage
+    from bobanana.config import LLM_TIMEOUT_SEC
+
+    if timeout_sec is None:
+        timeout_sec = LLM_TIMEOUT_SEC
+
     llm = get_llm()
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_prompt),
     ]
-    response = llm.invoke(messages)
-    return response.content
+
+    def _call():
+        response = llm.invoke(messages)
+        return response.content
+
+    pool = concurrent.futures.ThreadPoolExecutor(1)
+    future = pool.submit(_call)
+    try:
+        return future.result(timeout=timeout_sec)
+    except concurrent.futures.TimeoutError:
+        logger.warning("LLM 调用超时 (%.0fs)", timeout_sec)
+        pool.shutdown(wait=False)
+        raise TimeoutError(f"LLM 调用超时 ({timeout_sec}s)")
+    except Exception as e:
+        logger.error("LLM 调用失败: %s", e)
+        pool.shutdown(wait=True)
+        raise
+    else:
+        pool.shutdown(wait=True)

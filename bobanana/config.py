@@ -29,6 +29,7 @@ DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
 LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.1"))
 LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "4096"))
+LLM_TIMEOUT_SEC: int = int(os.getenv("LLM_TIMEOUT_SEC", "60"))  # LLM 调用超时
 
 # ── Embedding 配置 ───────────────────────────────────────────
 EMBEDDING_PROVIDER: Literal["openai", "sentence-transformers"] = os.getenv(

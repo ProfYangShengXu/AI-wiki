@@ -209,6 +209,26 @@ class CardService:
         """同步版列出卡片。"""
         return db_manager.list_cards(category, page, limit)
 
+    def get_card_sync(self, card_id: str):
+        return db_manager.get_card(card_id)
+
+    def update_card_sync(self, card_id: str, data):
+        card = db_manager.get_card(card_id)
+        if not card: return None
+        for f, v in data.model_dump(exclude_unset=True).items():
+            setattr(card, f, v)
+        embedding = self._compute_embedding(card.embedding_text())
+        db_manager.update_card(card_id, card, embedding)
+        return card
+
+    def delete_card_sync(self, card_id: str):
+        if not db_manager.get_card(card_id): return False
+        db_manager.delete_card(card_id)
+        return True
+
+    def get_categories_sync(self):
+        return db_manager.get_categories()
+
     def search_cards_sync(self, query: str, top_k: int = RETRIEVAL_TOP_K) -> list:
         """同步版搜索。"""
         embedding = self._compute_embedding(query)
@@ -216,20 +236,7 @@ class CardService:
 
     # ── Lifecycle ─────────────────────────────────────────
 
-    async def retry_failed(self) -> list[dict]:
-        if not self._pending_fails:
-            return []
-        retried = []
-        remaining = []
-        for item in self._pending_fails:
-            try:
-                logger.info("重试失败项目: %s", item.get("title"))
-                retried.append(item)
-            except Exception:
-                remaining.append(item)
-        self._pending_fails = remaining
-        return retried
-
+    
 
 # ── 全局单例 ─────────────────────────────────────────────
 

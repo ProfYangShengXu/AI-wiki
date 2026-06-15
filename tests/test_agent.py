@@ -151,25 +151,4 @@ class TestExtractRange:
         assert mock_llm.call_count >= 2
 
 
-class TestQaWorkers:
-    """QA 工作流子函数测试。"""
 
-    @patch("bobanana.agent.card_service")
-    def test_qa_search_worker_empty(self, mock_svc):
-        """空知识库返回空列表。"""
-        from bobanana.agent import _qa_search_worker
-
-        mock_svc.search_cards_sync.return_value = []
-        result = _qa_search_worker("test question")
-        assert result == []
-
-    @patch("bobanana.agent.llm_invoke")
-    def test_qa_answer_with_cards(self, mock_llm):
-        """有知识卡片时回答包含引用。"""
-        from bobanana.agent import _qa_answer_worker
-
-        mock_llm.return_value = "基于知识库，CPU 是中央处理器。"
-        cards = [{"title": "CPU", "content": "中央处理器", "examples": []}]
-        result = _qa_answer_worker("什么是CPU？", cards, [])
-        assert "CPU" in result
-        assert "中央处理器" in result

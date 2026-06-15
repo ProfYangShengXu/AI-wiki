@@ -9,10 +9,7 @@ from typing import Any, Callable, Optional
 from bobanana.config import RETRIEVAL_TOP_K
 from bobanana.models import CardCreate, ImportResult
 from bobanana.service.card_service import card_service
-from bobanana.tools import (
-    parse_document, web_search, embed_text, chunk_text, llm_invoke,
-    build_page_context, DocumentScanner,
-)
+from bobanana.tools import parse_document, llm_invoke, DocumentScanner
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +58,6 @@ SYSTEM_QA = """你是一个知识问答助手。基于知识库内容回答。
 
 SYSTEM_MODIFY = """你是一个卡片编辑助手。根据指令修改卡片，JSON 格式返回完整卡片。"""
 
-
 # ═══════════════════════════════════════════════════════════
 # 1. 三阶段导入流水线
 # ═══════════════════════════════════════════════════════════
@@ -90,7 +86,6 @@ def _parse_llm_json(text: str) -> Any:
         except json.JSONDecodeError:
             continue
     return None
-
 
 def _extract_range(pages: list, start: int, end: int, topic: str,
                    source_file: str, existing_titles: set) -> list[dict]:
@@ -175,27 +170,6 @@ def _extract_range(pages: list, start: int, end: int, topic: str,
                     existing_titles.add(tl)
                     deduped.append(item)
     return deduped
-
-
-def _search_and_supplement(item: dict) -> dict:
-    """网络搜索补充知识点。"""
-    if "信息不足" not in item.get("content", ""):
-        return item
-    query = f"{item['title']} {' '.join(item.get('aliases', []))}".strip()
-    try:
-        results = web_search(query, top_k=3)
-        if results:
-            context = "\n".join([f"- {r['snippet']}" for r in results if r.get("snippet")])
-            if context:
-                item["content"] = llm_invoke(
-                    "你是一个知识补充助手。",
-                    f"知识点: {item['title']}\n搜索结果:\n{context}\n请生成详细解释(100-300字)。"
-                ).strip()
-                item["_web_sourced"] = True
-    except Exception:
-        pass
-    return item
-
 
 def run_import_workflow(
     file_path: str,
@@ -310,75 +284,7 @@ def run_import_workflow(
         return ImportResult(total=len(all_cards), success=all_cards,
                             failed=all_failed + [{"reason": str(e)}])
 
-
 # ═══════════════════════════════════════════════════════════
 # 2. 问答工作流
-# ═══════════════════════════════════════════════════════════
-
-def _qa_search_worker(question: str) -> list[dict]:
-    cards = card_service.search_cards_sync(question, top_k=RETRIEVAL_TOP_K)
-    return [c.model_dump() for c, _ in cards]
 
 
-def _qa_answer_worker(question: str, cards_data: list[dict], history: list[dict]) -> str:
-    ctx = ""
-    if cards_data:
-        for c in cards_data:
-            ctx += f"## {c['title']}\n{c['content']}\n"
-            if c.get("examples"):
-                ctx += f"案例: {'; '.join(c['examples'][:2])}\n"
-    else:
-        ctx = "（知识库中未找到相关信息）"
-    hist_text = "\n".join([
-        f"{'用户' if m.get('role')=='user' else '助手'}: {m['content']}"
-        for m in history[-6:]
-    ])
-    return llm_invoke(SYSTEM_QA, f"""对话历史:\n{hist_text}\n\n知识库:\n{ctx}\n\n问题: {question}""").strip()
-
-
-def run_qa_workflow(
-    question: str,
-    chat_history: Optional[list[dict]] = None,
-    progress_callback: Optional[Callable] = None,
-) -> str:
-    def emit(event: dict):
-        if progress_callback:
-            try: progress_callback(event)
-            except Exception: pass
-
-    emit({"type": "progress", "stage": "qa_search", "status": "started"})
-    try:
-        cards = _qa_search_worker(question)
-        emit({"type": "progress", "stage": "qa_search", "status": "ok", "total": len(cards)})
-        emit({"type": "progress", "stage": "qa_answer", "status": "started"})
-        answer = _qa_answer_worker(question, cards, chat_history or [])
-        emit({"type": "progress", "stage": "qa_answer", "status": "ok"})
-        return answer
-    except Exception as e:
-        logger.error("问答异常: %s", e)
-        return f"抱歉，回答生成失败: {e}"
-
-
-# ═══════════════════════════════════════════════════════════
-# 3. 卡片修改
-# ═══════════════════════════════════════════════════════════
-
-async def modify_card(card_id: str, instruction: str, progress_callback=None) -> Optional[dict]:
-    card = await card_service.get_card(card_id)
-    if not card:
-        return None
-    prompt = f"""当前卡片:\n标题: {card.title}\n内容: {card.content}\n案例: {'; '.join(card.examples)}\n问题: {'; '.join(card.questions)}\n分类: {card.category}\n\n修改指令: {instruction}"""
-    try:
-        result = _parse_llm_json(llm_invoke(SYSTEM_MODIFY, prompt))
-        if not result:
-            return None
-        from bobanana.models import CardUpdate
-        update = {}
-        for f in ["title", "aliases", "content", "examples", "questions", "category"]:
-            if f in result and result[f] is not None:
-                update[f] = result[f]
-        updated = await card_service.update_card(card.id, CardUpdate(**update))
-        return updated.model_dump() if updated else None
-    except Exception as e:
-        logger.error("修改失败: %s", e)
-        return None

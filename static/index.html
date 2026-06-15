@@ -1,129 +1,209 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>StudyWiki-Agent</title>
-<link rel="stylesheet" href="/static/vendor/tailwind.min.css" onerror="this.onerror=null;this.href='https://cdn.tailwindcss.com'">
-<link rel="stylesheet" href="/static/vendor/daisyui.min.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/daisyui@4.4.0/dist/full.min.css'">
-<script defer src="/static/vendor/alpinejs.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/alpinejs@3.13.0/dist/cdn.min.js'"></script>
-<script defer src="/static/vendor/marked.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js'"></script>
-<style>html,body{height:100%;margin:0}#app{display:flex;flex-direction:column;height:100vh}.main-content{display:flex;flex:1;overflow:hidden}.sidebar{width:280px;overflow-y:auto;flex-shrink:0;font-size:13px}.card-area{flex:1;overflow-y:auto}.chat-panel{border-top:1px solid #e5e7eb}.chat-messages{max-height:200px;overflow-y:auto}.card-link{color:#2563eb;text-decoration:underline;text-decoration-style:dotted;font-weight:500;cursor:pointer}.card-link:hover{color:#1d4ed8;background:#eff6ff}.hidden-input{display:none}.tree-node{cursor:pointer;padding:2px 6px;display:flex;gap:4px;align-items:center;border-radius:4px}.tree-node:hover{background:#f3f4f6}.tree-node.active{background:#dbeafe;color:#1d4ed8}</style>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;height:100vh;font:13px/1.5 system-ui,sans-serif;color:#333}
+#app{display:flex;flex-direction:column;height:100vh}
+#sidebar{width:260px;overflow-y:auto;flex-shrink:0;background:#fff;border-right:1px solid #e0e0e0}
+.card-link{color:#2563eb;text-decoration:underline dotted;cursor:pointer}
+.card-link:hover{background:#eff6ff}
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center}
+.btn{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid #d0d0d0;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;line-height:1.4;gap:2px}
+.btn:hover{background:#f0f0f0}
+.btn-primary{background:#2563eb;color:#fff;border-color:#2563eb}
+.btn-primary:hover{background:#1d4ed8}
+.btn-error{color:#dc2626}
+.btn-success{background:#16a34a;color:#fff;border-color:#16a34a}
+.btn-success:hover{background:#15803d}
+.btn-sm{padding:4px 12px;font-size:12px}
+.btn-xs{padding:1px 6px;font-size:11px}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-ghost:hover{background:#f0f0f0}
+.btn-square{aspect-ratio:1}
+.badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;border:1px solid #d0d0d0;line-height:1.4}
+.badge-outline{background:transparent}
+.badge-sm{font-size:10px;padding:0 4px}
+.input{display:block;width:100%;padding:4px 6px;border:1px solid #d0d0d0;border-radius:4px;font-size:12px;line-height:1.4;outline:none}
+.input:focus{border-color:#2563eb;box-shadow:0 0 0 1px #2563eb}
+.input-sm{padding:2px 6px}
+.input-bordered{border-color:#d0d0d0}
+.textarea{display:block;width:100%;padding:4px 6px;border:1px solid #d0d0d0;border-radius:4px;font-size:12px;line-height:1.4;resize:vertical;outline:none}
+.textarea:focus{border-color:#2563eb;box-shadow:0 0 0 1px #2563eb}
+.textarea-bordered{border-color:#d0d0d0}
+.checkbox{width:14px;height:14px;cursor:pointer}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid #ccc;border-top-color:#2563eb;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cursor-pointer{cursor:pointer}
+.hover-bg:hover{background:#f0f0f0}
+.hover-blue:hover{background:#eff6ff}
+.border-b{border-bottom:1px solid #e0e0e0}
+.border-t{border-top:1px solid #e0e0e0}
+.border-r{border-right:1px solid #e0e0e0}
+.rounded{border-radius:4px}
+.text-xs{font-size:11px}
+.text-sm{font-size:12px}
+.text-base{font-size:14px}
+.text-lg{font-size:16px}
+.text-xl{font-size:18px}
+.font-bold{font-weight:700}
+.font-semibold{font-weight:600}
+.text-gray{color:#999}
+.text-blue-600{color:#2563eb}
+.text-red-500{color:#dc2626}
+.text-green-700{color:#15803d}
+.bg-green-50{background:#f0fdf4}
+.bg-yellow-50{background:#fefce8}
+.bg-red-50{background:#fef2f2}
+.border-green-200{border-color:#bbf7d0}
+.border-yellow-200{border-color:#fef08a}
+.border-red-200{border-color:#fecaca}
+.divider{margin:8px 0;border-bottom:1px solid #e0e0e0}
+.prose{max-width:none;white-space:pre-wrap}
+</style>
 </head>
 <body>
-<div id="app" x-data="app()">
-<header class="navbar bg-base-200 border-b px-2 py-0 min-h-0" style="height:36px">
-<div class="flex-1 flex items-center gap-1">
-<button class="btn btn-ghost btn-xs btn-square" @click="sidebar=!sidebar">-</button>
-<span class="font-bold text-sm">SWA v0.3</span>
-<label class="btn btn-outline btn-primary btn-xs" :class="{loading:up}">
-Upload<input type="file" class="hidden-input" accept=".pdf,.docx,.doc,.md,.txt" @change="upFile($event)"></label>
-</div>
-<div class="flex-none flex items-center gap-1">
-<input class="input input-bordered input-xs w-32" placeholder="Search" x-model="q" @input.debounce.500ms="search()">
-<button class="btn btn-ghost btn-xs" @click="log=!log">Log</button>
-</div>
-</header>
-
-<div class="main-content">
-<aside class="sidebar border-r bg-base-100 p-2" x-show="sidebar" x-transition>
-<div class="text-xs font-semibold text-gray-500 mb-1">Categories</div>
-<div x-show="load" class="text-xs text-gray-400 p-2">Loading...</div>
-<template x-for="c in cats" :key="c.id">
-<div class="tree-node text-sm" @click="selCat(c)" :class="{active:cid===c.id}">
-<span x-text="c.n"></span><span class="text-xs text-gray-400">(</span><span class="text-xs text-gray-400" x-text="c.t"></span><span class="text-xs text-gray-400">)</span>
-</div>
-</template>
-<div x-show="!load&&!cats.length" class="text-xs text-gray-400 p-2">No cards yet.</div>
-</aside>
-
-<main class="card-area p-4">
-<template x-if="card"><div class="card bg-white shadow border"><div class="card-body p-4">
-<h2 class="text-xl font-bold" x-text="card.title"></h2>
-<div class="badge badge-outline badge-sm mt-1" x-text="card.category"></div>
-<div class="divider my-2"></div>
-<div class="prose text-sm max-w-none" x-html="link(card.content)" @click.prevent="cardLink($event)"></div>
-<template x-if="card.examples?.length"><div class="mt-3"><h3 class="font-semibold text-sm mb-1">Examples</h3><template x-for="e in card.examples"><div class="text-sm ml-2 mb-1" x-html="link(e)" @click.prevent="cardLink($event)"></div></template></div></template>
-<template x-if="card.questions?.length"><div class="mt-3"><h3 class="font-semibold text-sm mb-1">Questions</h3><template x-for="q in card.questions"><div class="text-sm ml-2 mb-1" x-html="link(q)" @click.prevent="cardLink($event)"></div></template></div></template>
-<div class="text-xs text-gray-400 mt-3" x-text="card.source_file+(card.source_page?' p.'+card.source_page:'')"></div>
-</div></div></template>
-<div x-show="!card" class="flex items-center justify-center h-full text-gray-400">Select a category on the left</div>
-</main>
+<div id="app">
+<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;min-height:36px">
+<button class="btn btn-ghost btn-xs" onclick="A.toggleSide()" style="font-size:14px">&equiv;</button>
+<span style="font-weight:700;font-size:14px">SWA v0.3</span>
+<label class="btn btn-outline btn-primary btn-xs" style="cursor:pointer">Upload<input type="file" style="display:none" accept=".pdf,.docx,.doc,.md,.txt" onchange="A.upload(this)"></label>
+<button class="btn btn-ghost btn-xs" onclick="A.newCard()">+New</button>
+<div style="flex:1"></div>
+<button class="btn btn-ghost btn-xs" onclick="A.showExam()">Exam</button>
+<button class="btn btn-ghost btn-xs" onclick="A.showSettings()">Sets</button>
+<input class="input input-sm" style="width:120px" placeholder="Search" onkeydown="if(event.key==='Enter')A.search()">
 </div>
 
-<div class="chat-panel bg-base-200">
-<button class="btn btn-ghost btn-xs w-full rounded-none" @click="chat=!chat"><span x-text="chat?'-':'+'"></span> Chat <span x-show="cw" class="loading loading-dots loading-xs"></span></button>
-<div x-show="chat" x-transition class="px-3 pb-2"><div class="chat-messages mb-2 space-y-1" x-ref="chatBox"><template x-for="(m,i) in msgs" :key="i"><div class="chat" :class="m.u?'chat-end':'chat-start'"><div class="chat-bubble text-xs" :class="m.u?'chat-bubble-primary':''" x-html="md(m.t)"></div></div></template></div>
-<div class="flex gap-1"><input class="input input-bordered input-xs flex-1" x-model="input" @keydown.enter="send()" :disabled="cw"><button class="btn btn-primary btn-xs" @click="send()" :disabled="cw">Send</button></div></div>
+<div style="display:flex;flex:1;overflow:hidden">
+<aside id="sidebar" style="width:260px;overflow-y:auto;flex-shrink:0;background:#fff;border-right:1px solid #e0e0e0;padding:4px"><div style="padding:4px;color:#999">Loading...</div></aside>
+<main id="main" style="flex:1;overflow-y:auto;padding:16px"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Select a category</div></main>
 </div>
 
-<div x-show="log" class="fixed bottom-0 right-0 w-1/2 h-1/2 bg-gray-800 text-green-300 z-50 flex flex-col shadow-2xl" x-transition>
-<div class="flex justify-between px-2 py-1 bg-gray-700 text-xs font-medium"><span>Logs</span><button class="btn btn-ghost btn-xs" @click="log=false">X</button></div>
-<div class="flex-1 overflow-y-auto p-1 text-xs font-mono" x-ref="logBox"><template x-for="l in logs" :key="l.time"><div :class="{'text-red-400':l.level==='ERROR'}"><span class="opacity-60" x-text="l.time?.slice(11,19)"></span> <span x-text="l.level"></span> <span x-text="l.message"></span></div></template></div>
+<div style="background:#f5f5f5;border-top:1px solid #e0e0e0">
+<button class="btn btn-ghost btn-xs" style="width:100%;border-radius:0" onclick="A.toggleChat()"><span id="chatArrow">+</span> Chat</button>
+<div id="chatPanel" style="display:none;padding:0 12px 8px">
+<div style="display:flex;gap:4px;margin-bottom:4px">
+<button class="btn btn-xs" id="btnAsk" onclick="A.setMode('ask')">Ask</button>
+<button class="btn btn-xs" id="btnAgent" onclick="A.setMode('agent')">Agent</button>
 </div>
+<div id="chatMsgs" style="height:128px;overflow-y:auto;margin-bottom:4px"></div>
+<div style="display:flex;gap:4px"><input class="input input-sm" style="flex:1" id="chatMsgInput" onkeydown="if(event.key==='Enter')A.chatSend()"><button class="btn btn-primary btn-xs" onclick="A.chatSend()">Send</button></div>
+</div>
+</div>
+
+<div id="qzModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:600px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:16px">Quiz</span><button class="btn btn-ghost btn-xs" onclick="A.hide('qzModal')">X</button></div>
+<div id="qzBody"></div>
+</div></div>
+
+<div id="edModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:380px;max-width:90vw;padding:16px">
+<span style="font-weight:700;font-size:16px">Edit Card</span>
+<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Title</label><input class="input input-sm" id="edTitle"></div>
+<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Category</label><input class="input input-sm" id="edCat"></div>
+<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Content</label><textarea class="textarea" style="height:160px" id="edContent"></textarea></div>
+<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Examples (one per line)</label><textarea class="textarea" style="height:80px" id="edExamples"></textarea></div>
+<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+<button class="btn btn-ghost btn-sm" onclick="A.hide('edModal')">Cancel</button>
+<button class="btn btn-primary btn-sm" onclick="A.saveEdit()">Save</button>
+</div>
+</div></div>
+
+<div id="exModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:600px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:16px">Exam</span><button class="btn btn-ghost btn-xs" onclick="A.hide('exModal')">X</button></div>
+<div id="exBody"></div>
+</div></div>
+
+<div id="stModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:500px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:16px">Settings</span><button class="btn btn-ghost btn-xs" onclick="A.hide('stModal')">X</button></div>
+<div id="stBody"></div>
+</div></div>
+
 </div>
 
 <script>
-function app(){return{
-sidebar:true,chat:false,log:false,logs:[],load:true,cid:null,
-cats:[],card:null,q:"",
-msgs:[{u:false,t:"Hello! Ask me anything."}],input:"",cw:false,
-up:false,status:"",
-ws:null,titles:{},aliases:[],
-
-init(){this.fetchLogs();setInterval(()=>this.fetchLogs(),3000);this.wsConn();(async()=>{
-try{
+const $=id=>document.getElementById(id);
+const A={
+mode:'ask',ws:null,groups:[],cats:{},aliases:{},card:null,
+async init(){await this.load();await this.wsConnect()},
+async load(){
 const r=await fetch('/api/categories');const d=await r.json();
 if(d.status!=='success')return;
-let id=0;
+this.cats={};this.aliases={};const raw={};
 for(const c of d.data.categories||[]){
-let cc=0;
-try{const r2=await fetch('/api/cards?category='+encodeURIComponent(c)+'&limit=200');const d2=await r2.json();
-if(d2.data?.cards){cc=d2.data.cards.length;for(const ca of d2.data.cards){this.titles[ca.id]=ca.title;for(const n of [ca.title,...(ca.aliases||[])]){if(n&&n.length>=2)this.aliases.push({id:ca.id,name:n})}}}}
-catch(e){}
-this.cats.push({id:++id,n:c,t:cc,data:null});
+let cc=0,clist=[];
+try{const r2=await fetch('/api/cards?category='+encodeURIComponent(c)+'&limit=500');const d2=await r2.json();
+if(d2.data?.cards){cc=d2.data.cards.length;clist=d2.data.cards;
+for(const ca of d2.data.cards){for(const n of[ca.title,...(ca.aliases||[])]){if(n&&n.length>=2)this.aliases[n]=ca.id}}}}catch(e){}
+this.cats[c]={count:cc,cards:clist};
+const p=c.split(/[\/\-]/).filter(Boolean);const g=p[0]||c;
+if(!raw[g])raw[g]={total:0,children:{}};
+if(p.length>1)raw[g].children[c]=cc;else raw[g].total+=cc;
 }
-}catch(e){console.error(e)}
-this.load=false;
-})()},
-
-fetchLogs(){fetch('/api/logs?n=100').then(r=>r.json()).then(d=>{if(d.status==='success')this.logs=d.data}).catch(()=>{})},
-
-wsConn(){if(this.ws&&this.ws.readyState===WebSocket.OPEN)return;
-try{this.ws=new WebSocket('ws://'+location.host+'/ws/chat');
-this.ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='response'){this.msgs.push({u:false,t:m.content});this.cw=false}}catch(e){}};
-this.ws.onclose=()=>setTimeout(()=>this.wsConn(),3000)}catch(e){setTimeout(()=>this.wsConn(),3000)}},
-
-send(){const t=this.input.trim();if(!t||this.cw)return;this.msgs.push({u:true,t:t});this.input='';this.cw=true;
-if(this.ws&&this.ws.readyState===WebSocket.OPEN)this.ws.send(JSON.stringify({type:'message',content:t}))},
-
-async selCat(c){this.cid=c.id;
-try{const r=await fetch('/api/cards?category='+encodeURIComponent(c.n)+'&limit=1');const d=await r.json();
-if(d.data?.cards?.length)this.card=d.data.cards[0]}catch(e){}},
-
-async search(){const q=this.q.trim();if(q.length<2)return;
-try{const r=await fetch('/api/cards/search?q='+encodeURIComponent(q));const d=await r.json();
-if(d.data?.cards?.length)this.card=d.data.cards[0]}catch(e){}},
-
-async upFile(e){const f=e.target.files[0];if(!f)return;e.target.value='';this.up=true;this.status='Uploading '+f.name+'...';
-const fd=new FormData();fd.append('file',f);
-try{const r=await fetch('/api/upload',{method:'POST',body:fd});const d=await r.json();
-if(d.status==='success'){this.status='Imported '+d.data.imported+' cards';if(d.data.cards?.length)this.card=d.data.cards[0];}}catch(e){this.status='Error'}
-this.up=false;setTimeout(()=>{this.status='';location.reload()},3000)},
-
-md(t){if(!t)return'';try{return marked.parse(t)}catch(e){return t.replace(/\n/g,'<br>')}},
-
-link(t){if(!t)return'';let h=this.md(t);
-for(const{id,name}of[...this.aliases].sort((a,b)=>b.name.length-a.name.length)){
-if(!name||name.length<2)continue;
-const re=new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
-h=h.replace(re,(m,o,s)=>{if(s.lastIndexOf('<',o)>s.lastIndexOf('>',o))return m;return'<a class="card-link" href="#" data-cid="'+id+'">'+m+'</a>'});
+this.groups=[];let gid=0;
+for(const[gn,gv]of Object.entries(raw)){
+const group={id:++gid,name:gn,open:false,total:gv.total,children:[]};
+for(const[cn,ct]of Object.entries(gv.children)){const dn=cn.replace(gn+'/','').replace(gn+'-','');group.children.push({id:cn,name:dn,count:ct});group.total+=ct}
+this.groups.push(group);
 }
-return h},
-
-cardLink(e){const a=e.target.closest('.card-link');if(!a)return;const id=a.dataset.cid;
-fetch('/api/cards/'+id).then(r=>r.json()).then(d=>{if(d.status==='success')this.card=d.data}).catch(()=>{})}
-};}
+this.renderSidebar();
+},
+renderSidebar(){
+let h='<div style="font-size:11px;font-weight:600;color:#999;padding:0 4px;margin-bottom:4px">Categories</div>';
+for(const g of this.groups){
+h+='<div class="cursor-pointer" style="padding:2px 4px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="'+(g.children.length?'A.tg('+g.id+')':'A.lc(\''+g.name+'\')')+'" onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'\'">';
+h+='<span style="width:10px;font-size:11px;display:inline-block">'+(g.children.length?(g.open?'-':'+'):'')+'</span><span>'+g.name+'</span><span style="font-size:11px;color:#999;margin-left:auto">'+g.total+'</span></div>';
+if(g.open)for(const c of g.children)h+='<div class="cursor-pointer" style="padding:2px 4px;padding-left:20px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="A.lc(\''+c.id+'\')" onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'\'"><span>'+c.name+'</span><span style="font-size:11px;color:#999;margin-left:auto">'+c.count+'</span></div>';
+}
+$('sidebar').innerHTML=h;
+},
+tg(id){this.toggleGroup(id)},toggleGroup(id){const g=this.groups.find(x=>x.id===id);if(g){g.open=!g.open;this.renderSidebar()}},
+lc(full){this.listCards(full)},oc(id){this.openCard(id)},
+listCards(full){
+const d=this.cats[full];if(!d||!d.cards)return;
+let h='<button class="btn btn-ghost btn-xs" onclick="A.mainClear()">Back</button><div style="font-size:14px;font-weight:600;margin:8px 0">Cards:</div>';
+for(const ca of d.cards)h+='<div class="cursor-pointer" style="padding:4px 8px;border-radius:4px;color:#2563eb;font-size:12px" onclick="A.oc(\''+ca.id+'\')" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'">'+ca.title+'</div>';
+$('main').innerHTML=h;
+},
+async openCard(id){
+try{const r=await fetch('/api/cards/'+id);const d=await r.json();
+if(d.status!=='success')return;const ca=d.data;this.card=ca;
+let h='<button class="btn btn-ghost btn-xs" onclick="A.mainClear()">Back</button>';
+h+='<div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><div><span style="font-size:18px;font-weight:700">'+ca.title+'</span><span class="badge badge-outline badge-sm" style="margin-left:8px">'+ca.category+'</span></div>';
+h+='<div style="display:flex;gap:4px;margin-left:auto"><button class="btn btn-primary btn-xs" onclick="A.startQuiz()">Quiz</button><button class="btn btn-ghost btn-xs" onclick="A.editCard()">Edit</button><button class="btn btn-ghost btn-xs btn-error" onclick="A.delCard()">Del</button></div></div>';
+h+='<div class="divider"></div><div class="prose">'+this.linkify(ca.content)+'</div>';
+if(ca.examples&&ca.examples.length){h+='<div style="font-weight:600;font-size:12px;margin-top:12px">Examples</div>';for(const e of ca.examples)h+='<div style="margin:2px 0;margin-left:12px;font-size:12px">'+this.linkify(e)+'</div>'}
+$('main').innerHTML=h;
+}catch(e){}
+},
+mainClear(){$('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Select a category</div>';this.card=null},
+async delCard(){if(!this.card||!confirm('Delete: '+this.card.title+'?'))return;try{await fetch('/api/cards/'+this.card.id,{method:'DELETE'});this.mainClear();await this.load()}catch(e){alert('Delete failed')}},
+editCard(){if(!this.card)return;$('edTitle').value=this.card.title;$('edCat').value=this.card.category;$('edContent').value=this.card.content||'';$('edExamples').value=(this.card.examples||[]).join('\n');this.show('edModal')},
+async saveEdit(){const title=$('edTitle').value.trim();if(!title)return;const body={title,category:$('edCat').value||'未分类',content:$('edContent').value,examples:$('edExamples').value.split('\n').filter(Boolean)};try{await fetch('/api/cards/'+this.card.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});this.hide('edModal');await this.openCard(this.card.id)}catch(e){alert('Save failed')}},
+async startQuiz(){if(!this.card)return;$('qzBody').innerHTML='<button class="btn btn-primary btn-sm" style="width:100%" onclick="A.genQ()">Generate Questions</button>';this.show('qzModal');this.qz={card:this.card.id,qs:[],results:[],done:false,score:0,max:0}},
+async genQ(){if(!this.qz)return;$('qzBody').innerHTML='<div class="spinner" style="margin:8px auto"></div><div style="text-align:center;font-size:12px">Generating...</div>';try{const r=await fetch('/api/quiz/generate/'+this.qz.card,{method:'POST'});const d=await r.json();if(d.status!=='success')throw new Error('Failed');this.qz.qs=d.data.questions.map(q=>({...q,answer:''}));let h='';for(let i=0;i<this.qz.qs.length;i++){const q=this.qz.qs[i];h+='<div style="margin-top:8px;border:1px solid #e0e0e0;border-radius:4px;padding:8px"><p style="font-weight:600;font-size:12px">Q'+(i+1)+'. '+q.question+'</p><textarea class="textarea" style="width:100%;margin-top:4px;height:80px" id="qa'+i+'"></textarea></div>'}h+='<button class="btn btn-success btn-sm" style="width:100%;margin-top:8px" onclick="A.gradeQ()">Submit for Grading</button>';$('qzBody').innerHTML=h}catch(e){$('qzBody').innerHTML='<p style="color:#dc2626;font-size:12px">Generation failed</p><button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px" onclick="A.startQuiz()">Retry</button>'}},
+async gradeQ(){const answers=[];for(let i=0;i<this.qz.qs.length;i++)answers.push({question:this.qz.qs[i].question,answer:($('qa'+i)||{}).value||''});$('qzBody').innerHTML='<div class="spinner" style="margin:16px auto"></div><div style="text-align:center;font-size:12px;color:#999">Grading...</div>';try{const r=await fetch('/api/quiz/grade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:this.qz.card,answers})});const d=await r.json();if(d.status!=='success')throw new Error('Failed');let h='';const res=d.data.results||[];for(let i=0;i<this.qz.qs.length;i++){const r2=res[i]||{score:0,comment:'',reference:''};const bg=r2.score>=8?'bg-green-50':r2.score>=5?'bg-yellow-50':'bg-red-50';const bc=r2.score>=8?'border-green-200':r2.score>=5?'border-yellow-200':'border-red-200';h+='<div style="margin-top:8px;border:1px solid;border-radius:4px;padding:8px" class="'+bg+' '+bc+'"><p style="font-weight:600;font-size:12px">Q'+(i+1)+': '+this.qz.qs[i].question+' <span style="font-size:11px;padding:0 4px;border:1px solid #d0d0d0;border-radius:4px">'+r2.score+'/10</span></p><p style="font-size:11px;margin-top:4px"><b>Your answer:</b> '+answers[i].answer+'</p><p style="font-size:11px;margin-top:2px"><b>Feedback:</b> '+r2.comment+'</p>'+(r2.reference?'<p style="font-size:11px;margin-top:2px;color:#15803d"><b>Reference:</b> '+r2.reference+'</p>':'')+'</div>'}h+='<div style="text-align:center;font-size:16px;font-weight:700;margin-top:12px">Score: '+d.data.total_score+' / '+d.data.max_score+' ('+(d.data.total_score/d.data.max_score*100).toFixed(0)+'%)</div>';h+='<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:12px" onclick="A.hide(\'qzModal\')">Close</button>';h+='<button class="btn btn-primary btn-sm" style="width:100%;margin-top:4px" onclick="A.mergeQ()">Merge into Card</button>';$('qzBody').innerHTML=h}catch(e){$('qzBody').innerHTML='<p style="color:#dc2626">Grading failed: '+e.message+'</p>'}},
+async mergeQ(){if(!this.qz)return;$('qzBody').innerHTML='<div class="spinner" style="margin:16px auto"></div><div style="text-align:center;font-size:12px;color:#999">Merging into card...</div>';const answers=[];for(let i=0;i<this.qz.qs.length;i++)answers.push({question:this.qz.qs[i].question,answer:($('qa'+i)||{}).value||''});try{const r=await fetch('/api/quiz/merge/'+this.qz.card,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:this.qz.card,answers})});const d=await r.json();if(d.status==='success'){this.hide('qzModal');this.openCard(this.qz.card)}else alert('Merge failed: '+(d.detail||d.message))}catch(e){alert('Merge failed')}},
+async showExam(){this.show('exModal');let h='<p style="font-size:12px;margin-bottom:8px">Select categories:</p>';for(const g of this.groups)h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0"><input type="checkbox" class="checkbox" id="exG'+g.id+'" checked> <b>'+g.name+'</b> ('+g.total+')</label>';h+='<button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px" onclick="A.genExam()">Generate Exam</button>';$('exBody').innerHTML=h},
+async genExam(){const sel=[];for(const g of this.groups)if($('exG'+g.id).checked)sel.push(g.name);const ids=[];for(const gn of sel){const d=this.cats[gn];if(d&&d.cards)for(const ca of d.cards)ids.push(ca.id);for(const g of this.groups)if(g.name===gn)for(const c of g.children)if(this.cats[c.id])for(const ca of this.cats[c.id].cards)ids.push(ca.id)}if(!ids.length){alert('No cards selected');return}$('exBody').innerHTML='<div class="spinner" style="margin:8px auto"></div><div style="text-align:center;font-size:12px">Generating exam from '+ids.length+' cards...</div>';try{const r=await fetch('/api/quiz/exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_ids:ids})});const d=await r.json();if(d.status!=='success')throw new Error('Failed');let h='';const qs=d.data.questions||[];for(let i=0;i<qs.length;i++)h+='<div style="margin-top:8px;border:1px solid #e0e0e0;border-radius:4px;padding:8px"><p style="font-weight:600;font-size:12px">Q'+(i+1)+'. '+qs[i].question+'</p><textarea class="textarea" style="width:100%;margin-top:4px;height:80px" id="exA'+i+'"></textarea></div>';h+='<button class="btn btn-success btn-sm" style="width:100%;margin-top:8px" onclick="A.gradeExam()">Submit</button>';$('exBody').innerHTML=h;this.examQs=qs}catch(e){$('exBody').innerHTML='<p style="color:#dc2626">'+e.message+'</p>'}},
+async gradeExam(){if(!this.examQs)return;alert('Exam submitted!');this.hide('exModal')},
+async showSettings(){this.show('stModal');$('stBody').innerHTML='<div class="spinner" style="margin:8px auto"></div>';try{const r=await fetch('/api/settings/');const d=await r.json();if(d.status!=='success')throw new Error();const s=d.data.settings||{};const desc=d.data.descriptions||{};let h='';for(const[k,v]of Object.entries(s)){const label=desc[k]||k;const value=v||'';h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600">'+label+'</label><input class="input input-sm" id="sk_'+k+'" value="'+value.replace(/\"/g,'&quot;')+'" onmouseover="this.style.borderColor=\'#2563eb\'" onmouseout="this.style.borderColor=\'\'"></div>'}h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600">其他 Key (手动添加)</label><div style="display:flex;gap:4px"><input class="input input-sm" style="flex:1;font-size:11px" id="stNewKey" placeholder="KEY_NAME"><input class="input input-sm" style="flex:1" id="stNewVal" placeholder="value"></div></div>';h+='<button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px" onclick="A.saveSettings()">Save &amp; Restart Recommended</button>';$('stBody').innerHTML=h}catch(e){$('stBody').innerHTML='<p style="color:#dc2626;font-size:12px">Failed to load settings</p>'}},
+async saveSettings(){const updates=[];$('stBody').querySelectorAll('input[id^=sk_]').forEach(el=>{const key=el.id.slice(3);const val=el.value.trim();if(key&&val)updates.push({key,value:val})});const nk=$('stNewKey').value.trim();const nv=$('stNewVal').value.trim();if(nk&&nv)updates.push({key:nk,value:nv});if(!updates.length)return;$('stBody').innerHTML='<div class="spinner" style="margin:8px auto"></div><div style="text-align:center;font-size:12px;color:#999">Saving...</div>';try{const r=await fetch('/api/settings/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});const d=await r.json();if(d.status==='success'){alert(d.message);this.hide('stModal')}else alert('Save failed')}catch(e){alert('Save failed')}},
+linkify(t){if(!t)return'';const names=Object.entries(this.aliases).sort((a,b)=>b[0].length-a[0].length);let h=t;for(const[n,id]of names){const re=new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');h=h.replace(re,(m,o,s)=>{if(s.lastIndexOf('<',o)>s.lastIndexOf('>',o))return m;return'<a href="#" class="card-link" onclick="A.oc(\''+id+'\');return false">'+m+'</a>'})}return h},
+async search(){const q=document.querySelector('input[placeholder=Search]').value.trim();if(!q)return;const r=await fetch('/api/cards/search?q='+encodeURIComponent(q));const d=await r.json();if(d.data?.cards?.length)this.openCard(d.data.cards[0].id)},
+async upload(input){const f=input.files[0];if(!f)return;input.value='';const fd=new FormData();fd.append('file',f);try{await fetch('/api/upload',{method:'POST',body:fd});await this.load()}catch(e){alert('Upload failed')}},
+async newCard(){const t=prompt('Title:');if(!t)return;const c=prompt('Category:','未分类');if(!c)return;try{const r=await fetch('/api/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t,category:c})});const d=await r.json();if(d.status==='success'){await this.load();this.openCard(d.data.id)}}catch(e){alert('Create failed')}},
+async wsConnect(){if(this.ws&&this.ws.readyState===WebSocket.OPEN)return;try{this.ws=new WebSocket('ws://'+location.host+'/ws/chat');this.ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==='response'){const cm=$('chatMsgs');if(cm.lastChild)cm.removeChild(cm.lastChild);this.addMsg(false,d.content);this.load()}else if(d.type==='progress'){}}catch(e){}};this.ws.onclose=()=>this.ws=null}catch(e){}},
+addMsg(user,text){const div=document.createElement('div');div.style.display='flex';div.style.flexDirection=user?'row-reverse':'row';div.innerHTML='<div style="font-size:12px;padding:4px 8px;border-radius:8px;background:'+(user?'#2563eb':'#e0e0e0')+';color:'+(user?'#fff':'#333')+';max-width:80%">'+text+'</div>';$('chatMsgs').appendChild(div);$('chatMsgs').scrollTop=$('chatMsgs').scrollHeight},
+chatSend(){const t=$('chatMsgInput').value.trim();if(!t)return;$('chatMsgInput').value='';this.addMsg(true,t);this.addMsg(false,'<div class="spinner" style="margin:4px auto"></div><div style="text-align:center;font-size:11px;color:#999">Thinking...</div>');if(!this.ws||this.ws.readyState!==WebSocket.OPEN){this.wsConnect();return}this.ws.send(JSON.stringify({type:'message',content:t,data:{mode:this.mode}}))},
+setMode(m){this.mode=m;$('btnAsk').style.background=m==='ask'?'#2563eb':'#fff';$('btnAsk').style.color=m==='ask'?'#fff':'#333';$('btnAgent').style.background=m==='agent'?'#2563eb':'#fff';$('btnAgent').style.color=m==='agent'?'#fff':'#333'},
+toggleChat(){const p=$('chatPanel');const hidden=p.style.display==='none';p.style.display=hidden?'':'none';$('chatArrow').textContent=hidden?'-':'+'},
+toggleSide(){const s=$('sidebar');s.style.display=s.style.display==='none'?'':'none'},
+show(id){$(id).style.display=''},hide(id){$(id).style.display='none'},
+};
+A.init();
 </script>
 </body>
 </html>
