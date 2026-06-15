@@ -71,7 +71,8 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
     echo [OK] Tesseract found
 ) else (
     echo [WARNING] Tesseract not found. PDF 扫描件将无法识别文字。
-    echo   Download from: https://github.com/UB-Mannheim/tesseract/releases
+    echo   Download from: https://github.com/UB-Mannheim/tesseract/releases/tag/5.4.0
+    echo   (or use mirror: digi.bib.uni-mannheim.de/tesseract/)
     echo   Install to: C:\Program Files\Tesseract-OCR\
     echo   Ensure "Chinese (Simplified)" language pack is selected.
 )
