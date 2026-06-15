@@ -94,7 +94,7 @@ def parse_document(file_path: str) -> list[dict]:
 
 
 def _parse_pdf(file_path: str) -> list[dict]:
-    """解析 PDF — 逐页提取文本，文本少于 50 字时尝试 OCR。"""
+    """解析 PDF — 逐页提取文本，文本少于 20 字时尝试 OCR。"""
     import fitz  # PyMuPDF
     pages = []
     doc = fitz.open(file_path)
@@ -102,7 +102,7 @@ def _parse_pdf(file_path: str) -> list[dict]:
         page = doc[page_num]
         text = page.get_text().strip()
         # 文本太少 → 尝试 OCR
-        if len(text) < 50:
+        if len(text) < 20:
             ocr_text = _ocr_page(page)
             if ocr_text and len(ocr_text) > len(text):
                 text = ocr_text
