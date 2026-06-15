@@ -132,8 +132,15 @@ body{margin:0;overflow:hidden;height:100vh;font:13px/1.5 system-ui,sans-serif;co
 <script>
 const $=id=>document.getElementById(id);
 const A={
-mode:'ask',ws:null,groups:[],cats:{},aliases:{},card:null,
-async init(){await this.load();await this.wsConnect()},
+mode:'ask',ws:null,groups:[],cats:{},aliases:{},card:null,currentKB:'',kbs:[],
+async init(){await this.loadKB();await this.load();await this.wsConnect()},
+async switchKB(id){if(!id||id===this.currentKB)return;try{await fetch('/api/kb/switch/'+id,{method:'POST'});await this.loadKB();await this.load()}catch(e){alert('Switch failed')}},
+async showKBMgmt(){this.show('stModal');let h='<div style="margin-bottom:8px;font-weight:700;font-size:14px">Knowledge Bases</div>';h+='<div id="kbList"></div>';h+='<div style="margin-top:8px;display:flex;gap:4px"><input id="kbNameInput" class="input input-sm" style="flex:1" placeholder="New KB name"><button class="btn btn-primary btn-xs" onclick="A.createKB()">Create</button></div><div style="margin-top:8px;text-align:right"><button class="btn btn-ghost btn-xs" onclick="A.hide(\'stModal\')">Close</button></div>';$('stBody').innerHTML=h;this.renderKBList()},
+renderKBList(){const cur=this.currentKB||'';let h='<table style="width:100%;font-size:12px;border-collapse:collapse">';for(const kb of this.kbs){h+='<tr style="border-bottom:1px solid #eee"><td style="padding:4px">'+(kb.id===cur?'<b>': '')+kb.name+(kb.id===cur?'</b>':'')+'</td><td style="padding:4px;text-align:right"><button class="btn btn-ghost btn-xs" onclick="A.renameKB(\''+kb.id+'\',\''+kb.name+'\')" style="margin-right:4px">Rename</button>'+(kb.id!==cur?'<button class="btn btn-ghost btn-xs btn-error" onclick="A.delKB(\''+kb.id+'\')">Del</button>':'')+'</td></tr>'}h+='</table>';$('kbList').innerHTML=h},
+async renameKB(id,name){const n=prompt('New name:',name);if(!n)return;try{const r=await fetch('/api/kb/rename/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});const d=await r.json();if(d.status==='success'){await this.loadKB();this.renderKBList();this.renderSidebar()}}catch(e){alert('Rename failed')}},
+async delKB(id){if(!confirm('Delete KB?'))return;try{const r=await fetch('/api/kb/'+id,{method:'DELETE'});const d=await r.json();if(d.status==='success'){await this.loadKB();this.renderKBList();await this.load()}}catch(e){alert('Delete failed')}},
+async createKB(){const name=$('kbNameInput').value.trim();if(!name)return;try{const r=await fetch('/api/kb/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();if(d.status==='success'){await this.loadKB();await this.switchKB(d.data.id)}else alert('Create failed: '+(d.detail||d.message))}catch(e){alert('Create failed: '+e.message)}},
+async loadKB(){try{const r=await fetch('/api/kb/list');const d=await r.json();if(d.status==='success'){this.kbs=d.data.kbs||[];this.currentKB=d.data.current||''}}catch(e){}},
 async load(){
 const r=await fetch('/api/categories');const d=await r.json();
 if(d.status!=='success')return;
@@ -157,7 +164,11 @@ this.groups.push(group);
 this.renderSidebar();
 },
 renderSidebar(){
-let h='<div style="font-size:11px;font-weight:600;color:#999;padding:0 4px;margin-bottom:4px">Categories</div>';
+let h='<div style="display:flex;align-items:center;gap:4px;padding:0 4px 4px;border-bottom:1px solid #e0e0e0;margin-bottom:6px">';
+h+='<select id="kbSelect" style="flex:1;font-size:12px;padding:2px 4px;border:1px solid #d0d0d0;border-radius:4px" onchange="A.switchKB(this.value)">';
+for(const kb of this.kbs||[]){h+='<option value="'+kb.id+'"'+(kb.id===this.currentKB?' selected':'')+'>'+kb.name+' ('+(kb.card_count||0)+')</option>'}
+h+='</select><button class="btn btn-ghost btn-xs" onclick="A.showKBMgmt()" style="padding:0 4px;font-size:14px">+</button></div>';
+h+='<div style="font-size:11px;font-weight:600;color:#999;padding:0 4px;margin-bottom:4px">Categories</div>';
 for(const g of this.groups){
 h+='<div class="cursor-pointer" style="padding:2px 4px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="'+(g.children.length?'A.tg('+g.id+')':'A.lc(\''+g.name+'\')')+'" onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'\'">';
 h+='<span style="width:10px;font-size:11px;display:inline-block">'+(g.children.length?(g.open?'-':'+'):'')+'</span><span>'+g.name+'</span><span style="font-size:11px;color:#999;margin-left:auto">'+g.total+'</span></div>';

@@ -61,6 +61,12 @@ class DatabaseManager:
             logger.error("Health check failed: %s", e)
             raise
 
+    @property
+    def client(self):
+        if self._client is None:
+            raise RuntimeError("ChromaDB 未初始化")
+        return self._client
+
     async def _validate_dimension(self) -> None:
         count = self._collection.count()
         if count == 0: return

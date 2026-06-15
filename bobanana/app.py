@@ -13,7 +13,7 @@ from bobanana.config import STATIC_DIR, DEBUG, LOG_LEVEL
 from bobanana.database import db_manager
 from bobanana.log_handler import log_handler
 from bobanana.models import ApiResponse
-from bobanana.routes import cards, categories, history, upload, chat, quiz, settings
+from bobanana.routes import cards, categories, history, upload, chat, quiz, settings, knowledgebase
 
 # ── 日志配置 ─────────────────────────────────────────────
 logging.basicConfig(
@@ -140,6 +140,7 @@ app.include_router(upload.router)
 app.include_router(chat.router)
 app.include_router(quiz.router)
 app.include_router(settings.router)
+app.include_router(knowledgebase.router)
 
 
 # ── 根路由 ───────────────────────────────────────────────

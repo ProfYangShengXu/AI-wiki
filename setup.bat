@@ -62,6 +62,23 @@ if %errorlevel% neq 0 (
     echo [OK] Frontend assets downloaded
 )
 
+:: Tesseract OCR
+echo.
+echo Checking Tesseract OCR...
+if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
+    echo [OK] Tesseract found
+) else if exist "C:\Program Files (x86)\Tesseract-OCR\tesseract.exe" (
+    echo [OK] Tesseract found
+) else (
+    echo [WARNING] Tesseract not found. PDF 扫描件将无法识别文字。
+    echo   Download from: https://github.com/UB-Mannheim/tesseract/releases
+    echo   Install to: C:\Program Files\Tesseract-OCR\
+    echo   Ensure "Chinese (Simplified)" language pack is selected.
+)
+
+:: Remove old installer file
+if exist "tesseract_installer.exe" del tesseract_installer.exe
+
 :: Create .env if not exists
 if not exist ".env" (
     echo.

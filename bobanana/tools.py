@@ -94,20 +94,42 @@ def parse_document(file_path: str) -> list[dict]:
 
 
 def _parse_pdf(file_path: str) -> list[dict]:
-    """解析 PDF — 逐页提取文本。"""
+    """解析 PDF — 逐页提取文本，文本少于 50 字时尝试 OCR。"""
     import fitz  # PyMuPDF
     pages = []
     doc = fitz.open(file_path)
     for page_num in range(len(doc)):
         page = doc[page_num]
         text = page.get_text().strip()
-        if text:
-            pages.append({"page_num": page_num + 1, "text": text})
-        else:
-            pages.append({"page_num": page_num + 1, "text": ""})
+        # 文本太少 → 尝试 OCR
+        if len(text) < 50:
+            ocr_text = _ocr_page(page)
+            if ocr_text and len(ocr_text) > len(text):
+                text = ocr_text
+        pages.append({"page_num": page_num + 1, "text": text})
     doc.close()
-    logger.info("PDF 解析完成: %d 页", len(pages))
+    ocr_pages = sum(1 for p in pages if p.get("_ocr"))
+    if ocr_pages:
+        logger.info("PDF 解析完成: %d 页 (其中 %d 页使用 OCR)", len(pages), ocr_pages)
+    else:
+        logger.info("PDF 解析完成: %d 页", len(pages))
     return pages
+
+
+def _ocr_page(page) -> str:
+    """对 PyMuPDF 页面做 OCR。失败时返回空字符串。"""
+    try:
+        import pytesseract
+        from PIL import Image
+        import io
+        pix = page.get_pixmap(dpi=300)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        text = pytesseract.image_to_string(img, lang="chi_sim+eng").strip()
+        if text:
+            return text
+    except Exception as e:
+        logger.debug("OCR 失败 (页 %d): %s", page.number + 1, e)
+    return ""
 
 
 def _parse_docx(file_path: str) -> list[dict]:

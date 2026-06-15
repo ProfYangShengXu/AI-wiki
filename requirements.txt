@@ -4,6 +4,10 @@ uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 websockets>=12.0
 
+# OCR
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
 # AI 框架
 langchain>=0.1.0
 langgraph>=0.0.20
