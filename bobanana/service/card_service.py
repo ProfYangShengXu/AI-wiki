@@ -234,9 +234,78 @@ class CardService:
         embedding = self._compute_embedding(query)
         return db_manager.search_cards(embedding, top_k)
 
-    # ── Lifecycle ─────────────────────────────────────────
+    def deduplicate_sync(self, threshold: float = 0.93) -> dict:
+        """去重：查找语义相似的卡片，合并后删除重复。返回 {merged: N, deleted: N}。"""
+        import numpy as np
+        from bobanana.models import CardUpdate
 
-    
+        # 获取所有卡片+嵌入向量
+        result = db_manager._collection.get(include=["embeddings", "metadatas", "documents"])
+        if not result or not result.get("ids"):
+            return {"merged": 0, "deleted": 0}
+
+        ids = result["ids"]
+        metas = result["metadatas"]
+        docs = result["documents"]
+        embs = result.get("embeddings", [])
+
+        if len(ids) < 2 or len(embs) == 0:
+            return {"merged": 0, "deleted": 0}
+
+        # 计算相似度矩阵
+        emb_array = np.array(embs, dtype=np.float32)
+        norms = np.linalg.norm(emb_array, axis=1, keepdims=True)
+        norms[norms == 0] = 1
+        emb_norm = emb_array / norms
+        sim_matrix = np.dot(emb_norm, emb_norm.T)
+
+        merged = 0
+        deleted_ids = set()
+
+        for i in range(len(ids)):
+            if ids[i] in deleted_ids:
+                continue
+            for j in range(i + 1, len(ids)):
+                if ids[j] in deleted_ids:
+                    continue
+                if sim_matrix[i][j] > threshold:
+                    # 合并 j 到 i
+                    title_i = metas[i].get("title", "")
+                    title_j = metas[j].get("title", "")
+                    content_i = docs[i] or ""
+                    content_j = docs[j] or ""
+                    examples_i = metas[i].get("examples", "[]")
+                    examples_j = metas[j].get("examples", "[]")
+
+                    # 合并内容
+                    merged_content = content_i
+                    if content_j and content_j not in merged_content:
+                        merged_content += f"\n\n---\n\n{content_j[:500]}"
+
+                    # 合并案例
+                    try:
+                        ex_i = json.loads(examples_i) if isinstance(examples_i, str) else (examples_i or [])
+                    except: ex_i = []
+                    try:
+                        ex_j = json.loads(examples_j) if isinstance(examples_j, str) else (examples_j or [])
+                    except: ex_j = []
+                    all_ex = list(dict.fromkeys(ex_i + ex_j))
+
+                    # 更新卡片 i
+                    self.update_card_sync(ids[i], CardUpdate(
+                        title=title_i or title_j,
+                        content=merged_content,
+                        examples=all_ex,
+                    ))
+
+                    # 删除卡片 j
+                    self.delete_card_sync(ids[j])
+                    deleted_ids.add(ids[j])
+                    merged += 1
+                    logger.info("去重合并: %s ← %s (相似度 %.3f)", title_i, title_j, sim_matrix[i][j])
+
+        logger.info("去重完成: 合并 %d 对, 删除 %d 张", merged, len(deleted_ids))
+        return {"merged": merged, "deleted": len(deleted_ids)}
 
 # ── 全局单例 ─────────────────────────────────────────────
 

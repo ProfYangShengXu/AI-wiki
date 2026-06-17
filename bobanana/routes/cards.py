@@ -1,5 +1,6 @@
 """卡片 CRUD 路由 — 直通路由，不经 Agent。"""
 
+import asyncio
 import re
 
 from fastapi import APIRouter, HTTPException, Query
@@ -130,6 +131,13 @@ async def update_card(card_id: str, data: CardUpdate):
         message="卡片更新成功",
         data=CardResponse(**card.model_dump()).model_dump(),
     )
+
+
+@router.post("/deduplicate", response_model=ApiResponse)
+async def deduplicate_cards():
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, card_service.deduplicate_sync)
+    return ApiResponse(status="success", data=result)
 
 
 @router.delete("/{card_id}", response_model=ApiResponse)
