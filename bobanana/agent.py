@@ -171,6 +171,88 @@ def _extract_range(pages: list, start: int, end: int, topic: str,
                     deduped.append(item)
     return deduped
 
+def run_import_workflow_homework(
+    file_path: str,
+    filename: str,
+    progress_callback: Optional[Callable] = None,
+) -> ImportResult:
+    """作业导入 — 解析内容后匹配已有卡片并丰富，不创建新卡。"""
+    from bobanana.models import CardUpdate
+
+    def emit(event):
+        if progress_callback:
+            try: progress_callback(event)
+            except Exception: pass
+
+    emit({"type": "progress", "stage": "hw_parse", "status": "started"})
+    pages = parse_document(file_path)
+    full_text = "\n".join(p["text"] for p in pages if p["text"])
+    emit({"type": "progress", "stage": "hw_parse", "status": "ok", "total": len(pages)})
+
+    if not full_text.strip():
+        return ImportResult(success=[], failed=[{"page": 0, "error": "文件无文本"}], total=0)
+
+    emit({"type": "progress", "stage": "hw_search", "status": "started"})
+    existing_cards, total = card_service.list_cards_sync(limit=5000)
+    emit({"type": "progress", "stage": "hw_search", "status": "ok", "total": total})
+
+    if total == 0:
+        return ImportResult(success=[], failed=[{"page": 0, "error": "知识库为空"}], total=0)
+
+    card_list = "\n".join([f"- {c.title}: {c.content[:150]}" for c in existing_cards[:50]])
+    prompt = f"""你是一个知识库编辑。下面是现有卡片和一份学生作业。
+
+现有卡片 (共 {total} 张):
+{card_list}
+
+作业内容（{filename}）:
+{full_text[:3000]}
+
+分析作业中哪些知识点与已有卡片匹配，为每张匹配的卡片生成补充内容。
+
+返回 JSON 数组:
+[
+  {{
+    "title": "卡片标题（必须与现有卡片完全一致）",
+    "new_content": "基于作业的补充知识(200-400字)",
+    "new_examples": ["补充案例"]
+  }}
+]"""
+    emit({"type": "progress", "stage": "hw_llm", "status": "started"})
+    raw = llm_invoke("只返回 JSON 数组。", prompt, timeout_sec=120)
+    emit({"type": "progress", "stage": "hw_llm", "status": "ok"})
+
+    import re
+    try: matched = json.loads(raw)
+    except:
+        m = re.search(r"\[.*\]", raw, re.DOTALL)
+        matched = json.loads(m.group()) if m else []
+
+    success = []
+    for item in matched:
+        title = item.get("title", "")
+        new_content = item.get("new_content", "")
+        new_examples = item.get("new_examples", [])
+        if not title or not new_content:
+            continue
+        found = [c for c in existing_cards if c.title == title]
+        if not found:
+            found = [c for c in existing_cards if title in c.title or c.title in title]
+        if found:
+            card = found[0]
+            merged = card.content + "\n\n---\n**作业补充:**\n" + new_content
+            examples = list(set(card.examples + (new_examples or [])))
+            try:
+                card_service.update_card_sync(card.id, CardUpdate(content=merged, examples=examples))
+                success.append({"title": title, "action": "enriched"})
+                logger.info("作业丰富卡片: %s", title)
+            except Exception as e:
+                logger.warning("丰富失败 %s: %s", title, e)
+
+    logger.info("作业处理完成: 丰富 %d 张", len(success))
+    return ImportResult(success=success, failed=[], total=len(success))
+
+
 def run_import_workflow(
     file_path: str,
     filename: str,
