@@ -74,6 +74,7 @@ echo    [3] Skip
 set /p SC="    Enter [1-3]: "
 
 if "%SC%"=="1" (
+    del "%USERPROFILE%\Desktop\StudyWiki-Agent.lnk" 2>nul
     powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\StudyWiki-Agent.lnk');$s.TargetPath='%~dp0start_studywiki.bat';$s.WorkingDirectory='%~dp0';$s.Save()" >nul 2>&1
     echo    [OK] Desktop shortcut created
 )

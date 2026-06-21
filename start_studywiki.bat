@@ -1,14 +1,13 @@
 @echo off
-cd /d "C:\Users\45140\OneDrive\Desktop\code\AIwiki2.0"
-echo =========================================
-echo   StudyWiki-Agent v0.3.0
-echo   Starting server...
-echo =========================================
+cd /d "%~dp0"
+echo Starting StudyWiki-Agent...
 echo.
-start "SWA" /min cmd /c "python main.py"
+call .venv\Scripts\activate.bat 2>nul
+start "SWA" /min cmd /c "cd /d \"%~dp0\" && .venv\Scripts\python.exe main.py"
+echo Waiting for server to start...
 timeout /t 10 /nobreak >nul
 start "" "http://localhost:8000"
 echo.
-echo Server started at http://localhost:8000
-echo Close this window - server keeps running.
+echo Server: http://localhost:8000
+echo Close this window - server runs in background.
 timeout /t 3 /nobreak >nul
