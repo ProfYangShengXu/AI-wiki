@@ -22,8 +22,18 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".md", ".txt"}
 _tasks: dict[str, dict] = {}
 
 
-def _run_import_sync(file_path: str, filename: str, task_id: str, file_type: str = "course"):
+def _run_import_sync(file_path: str, filename: str, task_id: str, file_type: str = "course", kb_id: str = ""):
     """在线程中同步运行导入工作流，更新进度。"""
+    from bobanana.database import db_manager
+    from bobanana.config import CHROMA_COLLECTION_NAME
+    old_col = db_manager._collection
+    if kb_id and kb_id != CHROMA_COLLECTION_NAME:
+        try:
+            db_manager._collection = db_manager._client.get_or_create_collection(
+                name="kb_" + kb_id, metadata={"hnsw:space": "cosine"},
+            )
+        except:
+            pass
     try:
         if file_type == "hw":
             result = run_import_workflow_homework(file_path=file_path, filename=filename)
@@ -39,10 +49,12 @@ def _run_import_sync(file_path: str, filename: str, task_id: str, file_type: str
     except Exception as e:
         logger.error("导入失败: %s", e)
         _tasks[task_id] = {"status": "error", "message": str(e)}
+    finally:
+        db_manager._collection = old_col
 
 
 @router.post("", response_model=ApiResponse)
-async def upload_file(file: UploadFile = File(...), file_type: str = "course"):
+async def upload_file(file: UploadFile = File(...), file_type: str = "course", kb_id: str = ""):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
@@ -61,7 +73,7 @@ async def upload_file(file: UploadFile = File(...), file_type: str = "course"):
     _tasks[task_id] = {"status": "processing", "message": "解析中..."}
 
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, _run_import_sync, str(dest), safe_name, task_id, file_type)
+    loop.run_in_executor(None, _run_import_sync, str(dest), safe_name, task_id, file_type, kb_id)
 
     return ApiResponse(
         status="success",
