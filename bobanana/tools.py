@@ -94,25 +94,45 @@ def parse_document(file_path: str) -> list[dict]:
 
 
 def _parse_pdf(file_path: str) -> list[dict]:
-    """解析 PDF — 逐页提取文本，文本少于 20 字时尝试 OCR。"""
-    import fitz  # PyMuPDF
+    """解析 PDF — 逐页提取文本，文本少于 20 字时尝试 OCR。单页超时 30s。"""
+    import fitz, concurrent.futures
     pages = []
-    doc = fitz.open(file_path)
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        text = page.get_text().strip()
-        # 文本太少 → 尝试 OCR
-        if len(text) < 20:
-            ocr_text = _ocr_page(page)
-            if ocr_text and len(ocr_text) > len(text):
-                text = ocr_text
-        pages.append({"page_num": page_num + 1, "text": text})
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        logger.error("PDF 打开失败，尝试图片 OCR: %s", e)
+        try:
+            import pytesseract
+            from PIL import Image
+            img = Image.open(file_path)
+            text = pytesseract.image_to_string(img, lang="chi_sim+eng")
+            return [{"page_num": 1, "text": text.strip()}]
+        except:
+            return [{"page_num": 1, "text": ""}]
+    total = len(doc)
+    logger.info("PDF 共 %d 页", total)
+    for page_num in range(total):
+        try:
+            page = doc[page_num]
+            with concurrent.futures.ThreadPoolExecutor(1) as pool:
+                f = pool.submit(lambda p=page: p.get_text().strip())
+                try:
+                    text = f.result(timeout=30)
+                except concurrent.futures.TimeoutError:
+                    logger.warning("第 %d 页解析超时", page_num + 1)
+                    text = ""
+            if len(text) < 20:
+                ocr_text = _ocr_page(page)
+                if ocr_text and len(ocr_text) > len(text):
+                    text = ocr_text
+            pages.append({"page_num": page_num + 1, "text": text})
+        except Exception as e:
+            logger.warning("第 %d 页异常: %s", page_num + 1, e)
+            pages.append({"page_num": page_num + 1, "text": ""})
+        if (page_num + 1) % 20 == 0:
+            logger.info("解析进度: %d/%d 页", page_num + 1, total)
     doc.close()
-    ocr_pages = sum(1 for p in pages if p.get("_ocr"))
-    if ocr_pages:
-        logger.info("PDF 解析完成: %d 页 (其中 %d 页使用 OCR)", len(pages), ocr_pages)
-    else:
-        logger.info("PDF 解析完成: %d 页", len(pages))
+    logger.info("PDF 解析完成: %d 页", len(pages))
     return pages
 
 
