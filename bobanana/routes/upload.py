@@ -32,7 +32,7 @@ def _run_import_sync(file_path: str, filename: str, task_id: str, file_type: str
             db_manager._collection = db_manager._client.get_or_create_collection(
                 name="kb_" + kb_id, metadata={"hnsw:space": "cosine"},
             )
-        except:
+        except Exception:
             pass
     try:
         if file_type == "hw":

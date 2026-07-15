@@ -54,7 +54,7 @@ def _clean_json(raw: str) -> Optional[dict]:
     m = re.search(r"(\{.*\})", clean, re.DOTALL)
     if m: clean = m.group(1)
     try: return _json.loads(clean)
-    except: return None
+    except Exception: return None
 
 
 # ── 端点 ──────────────────────────────────────────────

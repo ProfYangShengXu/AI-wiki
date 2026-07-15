@@ -44,11 +44,11 @@ async def generate_card(data: CardCreate):
     m = re.search(r"(\{.*\})", clean, re.DOTALL)
     if m: clean = m.group(1)
     try: parsed = _json.loads(clean)
-    except:
+    except Exception:
         m = re.search(r"(\[.*\])", clean, re.DOTALL)
         if m:
             try: arr = _json.loads(m.group(1)); parsed = arr[0] if isinstance(arr, list) and arr else None
-            except: parsed = None
+            except Exception: parsed = None
         else: parsed = None
     if not parsed or not isinstance(parsed, dict):
         raise HTTPException(status_code=500, detail=f"LLM 生成失败，返回格式错误: {raw[:200]}")

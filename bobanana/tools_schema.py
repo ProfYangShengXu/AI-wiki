@@ -1,6 +1,5 @@
 """执行层工具 — 所有功能定义 JSON Schema + 执行函数。"""
 
-import asyncio
 import json as _json
 import re
 import logging
@@ -327,7 +326,7 @@ def _clean_json(raw: str) -> Optional[dict]:
     m = re.search(r"(\{.*\})", clean, re.DOTALL)
     if m: clean = m.group(1)
     try: return _json.loads(clean)
-    except: return None
+    except Exception: return None
 
 
 def _parse_json_array(raw: str) -> list:
@@ -337,4 +336,4 @@ def _parse_json_array(raw: str) -> list:
     try:
         result = _json.loads(clean)
         return result if isinstance(result, list) else [result]
-    except: return []
+    except Exception: return []

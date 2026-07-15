@@ -111,7 +111,7 @@ def run_agent_mode(
     def emit(evt):
         if progress_callback:
             try: progress_callback(evt)
-            except: pass
+            except Exception: pass
 
     tools_desc = _build_tools_desc()
     system = SYSTEM_AGENT.format(tools_desc=tools_desc)

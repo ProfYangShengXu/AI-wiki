@@ -2,7 +2,6 @@
 
 import json
 import logging
-import shutil
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -169,7 +168,7 @@ def _to_card(result: dict, index: int, is_query: bool = False) -> KnowledgeCard:
 
     def _parse_list(raw: str) -> list:
         try: return json.loads(raw) if isinstance(raw, str) else raw
-        except: return []
+        except Exception: return []
 
     return KnowledgeCard(
         id=cid,

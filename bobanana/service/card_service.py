@@ -285,10 +285,10 @@ class CardService:
                     # 合并案例
                     try:
                         ex_i = json.loads(examples_i) if isinstance(examples_i, str) else (examples_i or [])
-                    except: ex_i = []
+                    except Exception: ex_i = []
                     try:
                         ex_j = json.loads(examples_j) if isinstance(examples_j, str) else (examples_j or [])
-                    except: ex_j = []
+                    except Exception: ex_j = []
                     all_ex = list(dict.fromkeys(ex_i + ex_j))
 
                     # 更新卡片 i
