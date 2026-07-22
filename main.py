@@ -17,7 +17,7 @@ if hasattr(sys.stdout, "reconfigure"):
 import argparse
 import uvicorn
 
-from bobanana.config import HOST, PORT, LOG_LEVEL, DEBUG
+from bobanana.config import HOST, PORT, LOG_LEVEL
 
 
 def main():

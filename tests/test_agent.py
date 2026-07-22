@@ -1,8 +1,7 @@
 """agent.py 核心函数测试 — mock LLM，不依赖网络/Kay。"""
 
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from bobanana.agent import _parse_llm_json
 

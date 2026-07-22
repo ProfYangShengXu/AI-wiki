@@ -3,7 +3,7 @@
 import json as _json
 import re
 import logging
-from typing import Any, Callable, Optional
+from typing import Optional
 
 from bobanana.service.card_service import card_service
 from bobanana.models import CardCreate, CardUpdate

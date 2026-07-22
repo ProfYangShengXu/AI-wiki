@@ -1,7 +1,6 @@
 """tools.py 扩展测试 — DocumentScanner + web_search + llm_invoke (mock)。"""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from bobanana.tools import DocumentScanner, ScanResult, chunk_text
 

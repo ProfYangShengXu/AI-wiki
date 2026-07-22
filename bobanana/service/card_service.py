@@ -9,7 +9,7 @@ from typing import Optional
 
 from bobanana.config import RETRIEVAL_TOP_K
 from bobanana.database import db_manager
-from bobanana.models import KnowledgeCard, CardCreate, CardUpdate, CardResponse, ImportResult
+from bobanana.models import KnowledgeCard, CardCreate, CardUpdate, ImportResult
 from bobanana.tools import embed_text
 
 logger = logging.getLogger(__name__)

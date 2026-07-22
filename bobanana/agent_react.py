@@ -3,7 +3,7 @@
 import json
 import re
 import logging
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from bobanana.tools import llm_invoke
 from bobanana.tools_schema import TOOLS as TOOLS_SCHEMA, execute_tool

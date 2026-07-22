@@ -224,7 +224,7 @@ def run_import_workflow_homework(
 
     import re
     try: matched = json.loads(raw)
-    except:
+    except Exception:
         m = re.search(r"\[.*\]", raw, re.DOTALL)
         matched = json.loads(m.group()) if m else []
 

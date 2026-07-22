@@ -5,8 +5,6 @@ import logging
 import threading
 import re
 from pathlib import Path
-from typing import Optional
-
 from bobanana.config import (
     EMBEDDING_PROVIDER,
     EMBEDDING_DIMENSION,
@@ -107,7 +105,7 @@ def _parse_pdf(file_path: str) -> list[dict]:
             img = Image.open(file_path)
             text = pytesseract.image_to_string(img, lang="chi_sim+eng")
             return [{"page_num": 1, "text": text.strip()}]
-        except:
+        except Exception:
             return [{"page_num": 1, "text": ""}]
     total = len(doc)
     logger.info("PDF 共 %d 页", total)

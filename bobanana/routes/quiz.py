@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from bobanana.models import ApiResponse
 from bobanana.service.card_service import card_service

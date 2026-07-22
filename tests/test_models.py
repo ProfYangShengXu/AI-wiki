@@ -2,7 +2,6 @@
 
 import pytest
 from pydantic import ValidationError
-from datetime import datetime, timezone
 
 from bobanana.models import (
     KnowledgeCard, CardCreate, CardUpdate, CardResponse,
