@@ -1,7 +1,6 @@
 """WebSocket 对话路由 — 连接 Agent 问答工作流，推送进度事件。"""
 
 import asyncio
-import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 

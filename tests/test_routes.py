@@ -2,8 +2,6 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from starlette.testclient import TestClient as StarletteTestClient
-
 from bobanana.app import app
 from bobanana.database import db_manager
 from bobanana.config import CHROMA_DB_DIR

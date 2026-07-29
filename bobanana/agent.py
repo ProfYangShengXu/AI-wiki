@@ -6,7 +6,6 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Optional
 
-from bobanana.config import RETRIEVAL_TOP_K
 from bobanana.models import CardCreate, ImportResult
 from bobanana.service.card_service import card_service
 from bobanana.tools import parse_document, llm_invoke, DocumentScanner

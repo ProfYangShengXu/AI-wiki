@@ -1,6 +1,5 @@
 """设置 API — 前端可配置 LLM 参数。"""
 
-import os
 import logging
 from pathlib import Path
 
