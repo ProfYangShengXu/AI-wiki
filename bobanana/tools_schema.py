@@ -300,7 +300,7 @@ def execute_tool(tool_name: str, params: dict) -> dict:
 
         elif tool_name == "get_mastery":
             card = _find_card(params["card_id_or_title"])
-            if not card: return {"error": f"未找到卡片"}
+            if not card: return {"error": "未找到卡片"}
             from bobanana.routes.quiz import _mastery
             m = _mastery.get(card.id, {"attempts": 0, "score": 0})
             total = max(m["attempts"] * 10, 1)

@@ -7,10 +7,8 @@ import re
 from pathlib import Path
 from bobanana.config import (
     EMBEDDING_PROVIDER,
-    EMBEDDING_DIMENSION,
     SENTENCE_TRANSFORMERS_MODEL,
     OPENAI_EMBEDDING_MODEL,
-    RETRIEVAL_TOP_K,
 )
 
 logger = logging.getLogger(__name__)

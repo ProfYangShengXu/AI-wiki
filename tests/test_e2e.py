@@ -1,7 +1,6 @@
 """真实集成测试 — 端到端验证核心链路。"""
 
 import pytest
-import json
 from fastapi.testclient import TestClient
 
 from bobanana.app import app

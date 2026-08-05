@@ -11,8 +11,7 @@ import chromadb
 from chromadb.config import Settings
 
 from bobanana.config import (
-    CHROMA_DB_DIR, CHROMA_COLLECTION_NAME, CHROMA_PERSIST_INTERVAL,
-    CHROMA_DISK_STOP_MB, EMBEDDING_DIMENSION,
+    CHROMA_DB_DIR, CHROMA_COLLECTION_NAME, EMBEDDING_DIMENSION,
 )
 from bobanana.models import KnowledgeCard
 

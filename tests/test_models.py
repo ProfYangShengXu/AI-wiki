@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from bobanana.models import (
-    KnowledgeCard, CardCreate, CardUpdate, CardResponse,
-    CardListResponse, ImportResult, ApiResponse, WSMessage,
+    KnowledgeCard, CardCreate, CardUpdate,
+    ImportResult, ApiResponse, WSMessage,
 )
 
 

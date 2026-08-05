@@ -1,6 +1,5 @@
 """工具层 + 规划层测试。"""
 
-import json
 import pytest
 from unittest.mock import patch
 

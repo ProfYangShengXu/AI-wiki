@@ -1,6 +1,7 @@
 """CardService — 唯一写入入口，threading.Lock 序列化所有数据库变更。"""
 
 import asyncio
+import json
 import logging
 import threading
 import uuid

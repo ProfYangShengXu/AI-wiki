@@ -34,12 +34,10 @@ async def lifespan(app: FastAPI):
 
     # ── 启动时网络与资源检查 ───────────────────────────
     import socket
-    network_ok = True
     try:
         socket.create_connection(("8.8.8.8", 53), timeout=3)
         logger.info("网络连接正常")
     except OSError:
-        network_ok = False
         logger.warning("⚠ 无互联网连接 — 模型下载/LLM 调用将失败")
 
     # ── ChromaDB 初始化 ───────────────────────────────
