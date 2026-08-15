@@ -1,0 +1,455 @@
+prd:
+  version: 2
+  product_prd: docs/product/studywiki-agent-product-prd.html
+  priority_slot: v0.4-to-v0.5
+  description: >
+    完整系统 PRD v2。M1-M5 为 v0.4→v0.5 优化范围（对应产品 PRD §6），
+    M6-M11 为已建成核心系统模块的补充文档化。
+
+  # ── 优化范围模块（对应产品 PRD §6 本轮优化） ─────────────
+  modules:
+    - id: M1
+      name: 前端 UI 组件化（PicoCSS → 组件库）
+      summary: >
+        当前前端使用 PicoCSS + 手写 utility 类 + 原生 JS 组件（navbar/sidebar/card/modal）。
+        需替换为统一组件库，消除 48+ 行手写工具类，确保滚动/弹窗/布局无 bug。
+      interfaces:
+        - name: renderSidebar
+          input: { groups: TreeNode[] }
+          output: void
+          side_effects: [写入 DOM, 无服务端调用]
+        - name: renderCardDetail
+          input: { card: KnowledgeCard }
+          output: void
+          side_effects: [写入 DOM, linkify 替换超链接]
+        - name: showModal
+          input: { modalId: string, content: string }
+          output: void
+          side_effects: [设置 display 样式]
+      acceptance:
+        - id: M1-A1
+          desc: "侧边栏 77 个分类全部可见，可滚动，+/- 展开/收起"
+          check: "python -c 'import requests; r=requests.get(\"http://localhost:8000/\"); assert \"Categories\" in r.text'"
+          layer: S
+        - id: M1-A2
+          desc: "组件无 hand-written utility 类，全部使用组件库 class"
+          check: "grep -c 'style=\"' static/index.html | xargs test 0 -eq"
+          layer: U
+        - id: M1-A3
+          desc: "Modal 可显示/关闭，关闭后回到正常视图"
+          check: "curl -s http://localhost:8000/ | grep -q 'id=\"qzModal\"'"
+          layer: S
+      risks:
+        - dimension: 回滚
+          desc: "组件库可能不兼容当前页面结构。方案：保留旧 index.html.bak，随时回退"
+        - dimension: 安全
+          desc: "无风险——纯前端替换"
+      depends_on: []
+      tech_stack_note: >
+        当前实际使用 PicoCSS v2 + hand-written utility 类（flex/gap/mt-* 等）+ 原生 JS。
+        vendor/ 下存在 alpinejs / daisyui / tailwind / marked 文件但未加载。
+        组件库选型需在方案中确认（EUI-NEO / DaisyUI / 其他）。
+
+    - id: M2
+      name: 测试集补全 ≥ 100 用例
+      summary: 扩充测试覆盖：KB 隔离、上传作业 enrich、Agent ReAct 多轮、前端集成
+      interfaces:
+        - name: testKbIsolation
+          input: void
+          output: { passed: bool, details: string }
+          side_effects: [创建 ChromaDB 测试集合, 写入/读取/清理]
+        - name: testHomeworkEnrich
+          input: void
+          output: { passed: bool, enriched_count: int }
+          side_effects: [创建卡片, 更新卡片, 验证内容合并]
+        - name: testAgentReAct
+          input: void
+          output: { passed: bool, turn_count: int }
+          side_effects: [mock LLM, 验证工具调用链]
+      acceptance:
+        - id: M2-A1
+          desc: "KB 隔离测试：上传到 KB A 的卡片不在 KB B 中出现"
+          check: "python -m pytest tests/test_e2e.py::TestKbIsolation -x -q"
+          layer: I
+        - id: M2-A2
+          desc: "作业 enrich 测试：上传作业后匹配的卡片内容更新"
+          check: "python -m pytest tests/test_tools_layer.py::TestHomeworkEnrich -x -q"
+          layer: U
+        - id: M2-A3
+          desc: "Agent ReAct 多轮测试：至少 2 轮工具调用 + Final Answer"
+          check: "python -m pytest tests/test_tools_layer.py::TestAgentMode::test_agent_multi_turn -x -q"
+          layer: U
+        - id: M2-A4
+          desc: "总用例数 ≥ 100"
+          check: "python -m pytest tests/ --collect-only -q | tail -1 | python -c 'import sys;s=int(sys.stdin.read().split()[0]);assert s>=100'"
+          layer: A
+      risks:
+        - dimension: 技术债
+          desc: "测试夹具需要初始化 ChromaDB，测试时间可能 > 30s。加 @pytest.mark.slow 标记"
+      depends_on: [M1, M3, M4, M5]
+
+    - id: M3
+      name: PDF 解析容错 + 进度推送
+      summary: 加固 PDF 解析 pipeline，损坏文件降级 OCR、空页跳过、WSS 推送解析进度
+      interfaces:
+        - name: parsePdfWithFallback
+          input: { file_path: string }
+          output: { pages: Page[], fallback_used: bool }
+          side_effects: [文件 IO, OCR 调用]
+        - name: uploadProgressPush
+          input: { task_id: string, progress: { current: int, total: int } }
+          output: void
+          side_effects: [WebSocket 推送, 更新 _tasks 状态]
+      acceptance:
+        - id: M3-A1
+          desc: "QQ 浏览器转格式的损坏 PDF 不卡死，30s 内返回或降级"
+          check: "timeout 30 curl -s -X POST -F 'file=@tests/fixtures/broken.pdf' http://localhost:8000/api/upload"
+          layer: S
+        - id: M3-A2
+          desc: "全图片 PDF 走 OCR 成功提取文字"
+          check: "python -m pytest tests/test_tools.py::TestPdfParse::test_ocr_fallback -x -q"
+          layer: U
+        - id: M3-A3
+          desc: "解析进度通过 WebSocket 推送"
+          check: "python -m pytest tests/test_tools.py::TestPdfParse::test_progress_push -x -q"
+          layer: I
+      risks:
+        - dimension: 熔断
+          desc: "OCR（Tesseract）可能不在 PATH 中，需降级到纯文本提取"
+      depends_on: []
+
+    - id: M4
+      name: 加载/空/错误状态 UI 全覆盖
+      summary: 所有异步操作（上传/Quiz/KB 切换/搜索）显示 spinner、超时提示、失败重试按钮
+      interfaces:
+        - name: showLoading
+          input: { containerId: string, message?: string }
+          output: void
+          side_effects: [写入 DOM]
+        - name: showError
+          input: { containerId: string, error: string, retryFn?: () => void }
+          output: void
+          side_effects: [写入 DOM]
+      acceptance:
+        - id: M4-A1
+          desc: "上传中显示 spinner，完成后自动消失"
+          check: "python -m pytest tests/test_e2e.py::TestUIStates::test_upload_spinner -x -q"
+          layer: S
+        - id: M4-A2
+          desc: "网络失败时显示错误 + Retry 按钮"
+          check: "grep -c 'retryBtn\|Retry\|重试' static/index.html | xargs test 0 -gt"
+          layer: U
+      risks:
+        - dimension: 安全
+          desc: "无风险——纯 UI 展示"
+      depends_on: [M1]
+
+    - id: M5
+      name: KB 隔离加固（已有但不稳）
+      summary: 给 backend 的 KB switch + upload 流程加锁，防止并发 KB 污染
+      interfaces:
+        - name: switchKbWithLock
+          input: { kb_id: string }
+          output: void
+          side_effects: [切换 db_manager._collection, 线程安全]
+      acceptance:
+        - id: M5-A1
+          desc: "并发上传到 KB A 和 KB B，数据不混"
+          check: "python -m pytest tests/test_e2e.py::TestKbIsolation::test_concurrent_upload -x -q"
+          layer: I
+      risks:
+        - dimension: 容错
+          desc: "db_manager._collection 切换未加锁，并发可能写错 KB"
+      depends_on: []
+
+  # ── 核心系统模块（已建成，补充文档化） ──────────────────
+    - id: M6
+      name: Quiz & Mastery 系统
+      summary: >
+        基于 LLM 的出题/评分/组卷能力。支持单卡 3-5 道简答题生成、
+        AI 评分（0-10）+ 评语反馈、掌握度追踪（进程内）、跨卡组卷。
+      interfaces:
+        - name: generateQuiz
+          input: { card_id: string }
+          output: { questions: [{ question: string, ref_answer: string }] }
+          side_effects: [LLM 调用]
+        - name: gradeQuiz
+          input: { card_id: string, answers: [{ question: string, answer: string }] }
+          output: { results: [{ score: int, comment: string, reference: string }], mastery_pct: int }
+          side_effects: [LLM 调用, 更新 _mastery 字典]
+        - name: mergeQuizToCard
+          input: { card_id: string, answers: [{ question: string, answer: string }] }
+          output: { card: CardResponse }
+          side_effects: [LLM 调用, 更新 ChromaDB 卡片]
+        - name: createExam
+          input: { card_ids: string[] }
+          output: { questions: [{ question: string, ref_answer: string, related_cards: string[] }] }
+          side_effects: [LLM 调用, 批量提升掌握度]
+        - name: getMastery
+          input: { card_id: string }
+          output: { mastery_pct: int, attempts: int, score: int }
+          side_effects: []
+        - name: getBatchMastery
+          input: { card_ids: string[] }
+          output: { mastery: dict[str, int] }
+          side_effects: []
+      acceptance:
+        - id: M6-A1
+          desc: "生成题目：有效 card_id → 返回 3-5 道简答题"
+          check: "curl -s -X POST http://localhost:8000/api/quiz/generate/{card_id} | python -c 'import json,sys;r=json.load(sys.stdin);assert len(r[\"data\"][\"questions\"])>=3'"
+          layer: I
+        - id: M6-A2
+          desc: "AI 评分：提交答案 → 返回 score(0-10) + comment + reference"
+          check: "python -m pytest tests/test_e2e.py::TestQuiz::test_grade_quiz -x -q"
+          layer: I
+        - id: M6-A3
+          desc: "掌握度追踪：评分后 mastery_pct 非空"
+          check: "python -m pytest tests/test_e2e.py::TestQuiz::test_mastery_tracking -x -q"
+          layer: U
+        - id: M6-A4
+          desc: "组卷：多卡片生成综合题，每道题标注 related_cards"
+          check: "python -m pytest tests/test_e2e.py::TestQuiz::test_exam_generation -x -q"
+          layer: U
+        - id: M6-A5
+          desc: "不存在的 card_id → 404"
+          check: "curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/api/quiz/generate/nonexistent | xargs test 404 -eq"
+          layer: A
+      risks:
+        - dimension: 安全
+          desc: "LLM 调用可能注入恶意 prompt。方案：已有 system prompt 硬编码，用户输入不直接拼入 system"
+        - dimension: 容错
+          desc: "_mastery 字典进程内存储，重启丢失。方案：后续需迁移到持久化存储"
+        - dimension: 熔断
+          desc: "LLM 调用可能超时。方案：tools.py 已有 llm_invoke 超时机制（默认 30s）"
+      depends_on: [M10]
+
+    - id: M7
+      name: Settings 配置管理
+      summary: >
+        提供前端可读写的运行时配置接口。核心参数包括 LLM 供应商/模型/温度/超时、
+        Embedding 供应商选择。配置持久化到 .env 文件。
+      interfaces:
+        - name: getSettings
+          input: void
+          output: { settings: dict, descriptions: dict }
+          side_effects: [读取 .env]
+        - name: saveSetting
+          input: { key: string, value: string }
+          output: { message: string }
+          side_effects: [写入 .env]
+        - name: saveSettings
+          input: [{ key: string, value: string }]
+          output: { message: string }
+          side_effects: [批量写入 .env]
+      acceptance:
+        - id: M7-A1
+          desc: "GET /api/settings/ → 返回当前全部配置 + 描述"
+          check: "curl -s http://localhost:8000/api/settings/ | python -c 'import json,sys;r=json.load(sys.stdin);assert \"data\" in r'"
+          layer: I
+        - id: M7-A2
+          desc: "POST /api/settings/ 更新一条配置 → 确认写入 .env"
+          check: "curl -s -X POST -H 'Content-Type: application/json' -d '{\"key\":\"LLM_TEMPERATURE\",\"value\":\"0.5\"}' http://localhost:8000/api/settings/ | python -c 'import json,sys;r=json.load(sys.stdin);assert r[\"status\"]==\"success\"'"
+          layer: I
+        - id: M7-A3
+          desc: "批量更新多条配置"
+          check: "curl -s -X POST -H 'Content-Type: application/json' -d '[{\"key\":\"LLM_TEMPERATURE\",\"value\":\"0.3\"},{\"key\":\"LLM_MAX_TOKENS\",\"value\":\"2048\"}]' http://localhost:8000/api/settings/batch | python -c 'import json,sys;r=json.load(sys.stdin);assert r[\"status\"]==\"success\"'"
+          layer: I
+      risks:
+        - dimension: 安全
+          desc: "API Key 可能通过前端泄露。方案：.env 文件权限仅限本机，settings API 不在日志中打印完整 Key"
+        - dimension: 回滚
+          desc: "更新 .env 可能破坏语法。方案：保存前校验 key 是否在 RELOAD_KEYS 白名单中"
+      depends_on: []
+
+    - id: M8
+      name: WebSocket Chat & Ask/Agent 双模式
+      summary: >
+        WebSocket 实时对话系统。支持 Ask 模式（仅检索知识库回答）
+        和 Agent 模式（CoT + ReAct 循环，最多 6 轮工具调用）。
+        含 ConnectionManager 连接管理 + 进度事件推送。
+      interfaces:
+        - name: connectWebSocket
+          input: void
+          output: { conn_id: int }
+          side_effects: [WebSocket accept, 发送欢迎消息]
+        - name: handleQuestion (Ask)
+          input: { question: string, chat_history: list[dict] }
+          output: { answer: string }
+          side_effects: [搜索知识库, LLM 调用, 更新 chat_history]
+        - name: handleAgent (ReAct)
+          input: { instruction: string, chat_history: list[dict], max_turns: int }
+          output: { answer: string }
+          side_effects: [Thought→Action→Observation 循环, 工具调用(最多6轮), LLM 调用]
+        - name: pushProgress
+          input: { conn_id: int, event: { stage: string, status: string, tool?: string } }
+          output: void
+          side_effects: [WebSocket send_text]
+      acceptance:
+        - id: M8-A1
+          desc: "WebSocket 连接建立 → 收到欢迎消息"
+          check: "python -c \"from websockets.sync.client import connect;ws=connect('ws://localhost:8000/ws/chat');msg=ws.recv();assert '你好' in msg;ws.close()\""
+          layer: I
+        - id: M8-A2
+          desc: "Ask 模式：发送问题 → 收到回答（含知识库引用）"
+          check: "python -m pytest tests/test_tools_layer.py::TestAskMode -x -q"
+          layer: U
+        - id: M8-A3
+          desc: "Agent 模式：发送指令 → 执行工具 → Final Answer"
+          check: "python -m pytest tests/test_tools_layer.py::TestAgentMode::test_agent_multi_turn -x -q"
+          layer: U
+        - id: M8-A4
+          desc: "Agent 模式未知工具 → 优雅回复，不崩溃"
+          check: "python -m pytest tests/test_tools_layer.py::TestAgentMode::test_agent_unknown_tool -x -q"
+          layer: A
+      risks:
+        - dimension: 容错
+          desc: "Agent 循环可能死循环。方案：max_turns=6 硬限制 + 超时兜底"
+        - dimension: 监控
+          desc: "WebSocket 连接数无上限。方案：后续需加最大连接限制"
+      depends_on: [M10]
+
+    - id: M9
+      name: Agent 多阶段导入 Pipeline
+      summary: >
+        上传文档后的全自动处理流水线。三阶段：预扫描（DocumentScanner 跳过空白/封面/目录）
+        → 智能提取（短区间逐页/长区间聚合/3 线程并发）→ 增量入库（含去重）。
+        另支持 Homework 模式（匹配已有卡片并 enrich 内容）。
+      interfaces:
+        - name: runImportWorkflow
+          input: { file_path: string, progress_callback?: Callable }
+          output: ImportResult
+          side_effects: [文件 IO, LLM 调用, ChromaDB 写入, OCR 调用]
+        - name: runImportHomework
+          input: { file_path: string, progress_callback?: Callable }
+          output: ImportResult
+          side_effects: [文件 IO, LLM 调用, 匹配已有卡片, ChromaDB 更新]
+        - name: documentScan
+          input: { pages: Page[] }
+          output: { valid_ranges: [(int, int)], skipped: { blank: int, toc: int, cover: int } }
+          side_effects: []
+        - name: extractRange
+          input: { pages: Page[], start: int, end: int }
+          output: { cards: CardCreate[] }
+          side_effects: [LLM 调用]
+      acceptance:
+        - id: M9-A1
+          desc: "上传 MD 文件 → 成功提取 ≥ 1 张知识卡片"
+          check: "python -m pytest tests/test_agent.py::TestImport::test_import_md -x -q"
+          layer: U
+        - id: M9-A2
+          desc: "作业上传 → enrich 匹配的卡片（内容增长）"
+          check: "python -m pytest tests/test_tools_layer.py::TestHomeworkEnrich -x -q"
+          layer: U
+        - id: M9-A3
+          desc: "空文件 → 返回 ImportResult(failed=0, success=0)"
+          check: "python -m pytest tests/test_agent.py::TestImport::test_import_empty -x -q"
+          layer: U
+        - id: M9-A4
+          desc: "DocumentScanner 跳过封面/目录/空白页"
+          check: "python -m pytest tests/test_tools_ext.py::TestDocumentScanner -x -q"
+          layer: U
+      risks:
+        - dimension: 容错
+          desc: "LLM 提取可能返回无效 JSON。方案：_parse_llm_json 有 4 层 fallback（代码块/单引号/尾逗号/截断修复）"
+        - dimension: 熔断
+          desc: "大文档可能超时。方案：短区间逐页（≤2页）vs 长区间聚合（≥3页），3 线程并发"
+        - dimension: 监控
+          desc: "进度回调通过 call_soon_threadsafe 推送到 WebSocket，可能丢失"
+      depends_on: [M10, M3]
+
+    - id: M10
+      name: Card CRUD Service Layer
+      summary: >
+        唯一写入入口层。CardService 单例封装所有 ChromaDB 操作，threading.Lock 序列化写操作，
+        embedding 在锁外预计算避免阻塞。含去重（余弦相似度 0.93 阈值）、自动关联检测。
+      interfaces:
+        - name: createCard
+          input: { title: string, content: string, category?: string, ... }
+          output: KnowledgeCard
+          side_effects: [ChromaDB 写入, embedding 计算, 关联检测]
+        - name: updateCard
+          input: { card_id: string, updates: { title?, content?, ... } }
+          output: KnowledgeCard | null
+          side_effects: [ChromaDB 更新, embedding 重新计算]
+        - name: deleteCard
+          input: { card_id: string }
+          output: bool
+          side_effects: [ChromaDB 删除]
+        - name: getCard
+          input: { card_id: string }
+          output: KnowledgeCard | null
+          side_effects: []
+        - name: listCards
+          input: { category?: string, page?: int, limit?: int }
+          output: { cards: KnowledgeCard[], total: int }
+          side_effects: []
+        - name: searchCards
+          input: { query: string, top_k?: int }
+          output: [(KnowledgeCard, float)]
+          side_effects: [embedding 计算]
+        - name: batchImport
+          input: { cards: CardCreate[] }
+          output: ImportResult
+          side_effects: [ChromaDB 批量写入, embedding 预计算, 关联检测]
+        - name: deduplicate
+          input: { threshold?: float }
+          output: { merged: int, deleted: int }
+          side_effects: [ChromaDB 合并/删除, cosine 相似度矩阵计算]
+        - name: getCategories
+          input: void
+          output: [string]
+          side_effects: []
+      acceptance:
+        - id: M10-A1
+          desc: "创建卡片 → 返回含 id 的完整卡片"
+          check: "python -m pytest tests/test_database.py::TestCardService::test_create_card -x -q"
+          layer: U
+        - id: M10-A2
+          desc: "搜索卡片 → 返回按相似度排序的结果"
+          check: "python -m pytest tests/test_database.py::TestCardService::test_search -x -q"
+          layer: U
+        - id: M10-A3
+          desc: "批量导入 100 张卡片 → 成功全部写入"
+          check: "python -m pytest tests/test_database.py::TestCardService::test_batch_import -x -q"
+          layer: I
+        - id: M10-A4
+          desc: "语义去重 → 合并相似卡片，删除重复"
+          check: "python -m pytest tests/test_database.py::TestCardService::test_deduplicate -x -q"
+          layer: U
+        - id: M10-A5
+          desc: "不存在的 card_id 删除 → 返回 False"
+          check: "python -m pytest tests/test_database.py::TestCardService::test_delete_not_found -x -q"
+          layer: A
+      risks:
+        - dimension: 技术债
+          desc: "CardService 的同步方法 (create_card_sync) 用 asyncio.run() 创建新事件循环，嵌套调用可能崩溃"
+        - dimension: 监控
+          desc: "_pending_fails 列表仅记录未被消费，无告警"
+      depends_on: []
+      note: >
+        此模块是 M6/M8/M9 的基础依赖。当前 database.py 已有 threading.Lock 序列化写操作，
+        card_service.py 实现了 embedding 锁外预计算优化。
+
+    - id: M11
+      name: Browse History（P1 骨架）
+      summary: >
+        浏览历史记录。当前为 P1 骨架实现：进程内内存列表，最多 100 条。
+        后续需持久化到 ChromaDB 或 SQLite。
+      interfaces:
+        - name: recordHistory
+          input: { card_id: string, title: string, timestamp: string }
+          output: void
+          side_effects: [内存列表追加]
+        - name: getHistory
+          input: void
+          output: { history: [{ card_id: string, title: string, timestamp: string }] }
+          side_effects: []
+      acceptance:
+        - id: M11-A1
+          desc: "记录浏览历史 → 在历史列表中可见"
+          check: "python -m pytest tests/test_routes.py::TestHistory -x -q"
+          layer: U
+      risks:
+        - dimension: 技术债
+          desc: "P1 骨架，重启丢失。后续计划：迁移到 ChromaDB/SQLite 持久化"
+      depends_on: []

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><title>StudyWiki-Agent · 技术架构 v2.0</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.7 system-ui,sans-serif;color:#1a1a2e;background:#f8f9fc;padding:40px 20px;max-width:960px;margin:0 auto}
+h1{font-size:26px;font-weight:700;margin-bottom:4px;color:#16213e}
+h2{font-size:20px;font-weight:600;margin-top:36px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+h3{font-size:16px;font-weight:600;margin-top:24px;margin-bottom:8px;color:#2d3748}
+p,li{color:#4a5568;margin-bottom:8px}
+ul{padding-left:20px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:14px}
+th,td{border:1px solid #e2e8f0;padding:10px 14px;text-align:left;vertical-align:top}
+th{background:#edf2f7;font-weight:600}
+code{background:#edf2f7;padding:1px 5px;border-radius:3px;font-size:13px}
+.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;margin:2px}
+.badge-p0{background:#fed7d7;color:#9b2c2c}
+.badge-p1{background:#fefcbf;color:#744210}
+.badge-p2{background:#c6f6d5;color:#22543d}
+.badge-core{background:#bee3f8;color:#2a4365}
+.box{background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin:12px 0}
+.diagram{background:#1e293b;color:#e2e8f0;border-radius:8px;padding:20px;font-family:monospace;font-size:13px;line-height:1.6;margin:12px 0;white-space:pre;overflow-x:auto}
+.task-card{border:1px solid #e2e8f0;border-radius:6px;padding:12px 16px;margin:8px 0;background:#fff}
+.task-card .meta{font-size:12px;color:#718096}
+</style>
+</head>
+<body>
+
+<h1>🧠 StudyWiki-Agent · 技术架构 v2.0</h1>
+<p style="color:#4299e1;font-size:16px;margin:4px 0 24px">版本 v2.0 · 基于产品 PRD v0.4 · 覆盖全系统 11 模块</p>
+
+<!-- ============================================================ -->
+<h2>1. 架构概览</h2>
+
+<div class="diagram">
+┌──────────────────────────────────────────────────────────────────┐
+│                        Browser (PicoCSS + 原生 JS)              │
+│  ┌──────────┐  ┌──────────────┐  ┌───────────────┐  ┌───────┐  │
+│  │ Sidebar  │  │ Card Area    │  │ Chat Panel    │  │Modal  │  │
+│  │ 知识树   │  │ 卡片详情/搜索 │  │ Ask/Agent 双模│  │Quiz等 │  │
+│  └────┬─────┘  └──────┬───────┘  └──────┬────────┘  └───┬───┘  │
+└───────┼───────────────┼─────────────────┼───────────────┼──────┘
+        │ HTTP/JSON     │ HTTP/JSON       │ WebSocket     │HTTP
+┌───────▼───────────────▼─────────────────▼───────────────▼──────┐
+│                    FastAPI Backend                               │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  8 个路由模块 (M6/M7/M8/M11 + cards/categories/kb)      │   │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────┐  │   │
+│  │  │ Quiz   │ │Upload  │ │ Chat*  │ │Settings│ │Cards │  │   │
+│  │  │ M6     │ │ 路由   │ │ M8* WS │ │ M7     │ │CRUD  │  │   │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘ └──────┘  │   │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐          │   │
+│  │  │History │ │Cat.    │ │ KB     │ │Logs    │          │   │
+│  │  │ M11    │ │路由    │ │ M5*    │ │/health │          │   │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘          │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  Agent 层 (M8/M9)                                        │   │
+│  │  ┌──────────────────┐   ┌───────────────────────────┐    │   │
+│  │  │ agent_react.py   │   │ agent.py                  │    │   │
+│  │  │ CoT + ReAct 循环 │   │ 三阶段导入流水线           │    │   │
+│  │  │ Ask/Agent 双模式 │   │ 预扫描→提取→入库+HW enrich│    │   │
+│  │  └────────┬─────────┘   └───────────┬───────────────┘    │   │
+│  └───────────┼─────────────────────────┼────────────────────┘   │
+│              │                         │                        │
+│  ┌───────────▼─────────────────────────▼────────────────────┐   │
+│  │  tools_schema.py — 12 个 Agent 工具 Function Calling     │   │
+│  │  (search / list / get / create / update / delete /       │   │
+│  │   upload / quiz / grade / exam / mastery / web_search)   │   │
+│  └───────────────────────────┬──────────────────────────────┘   │
+│                              │                                  │
+│  ┌──────────────────────────▼──────────────────────────────┐   │
+│  │  CardService (M10) — 唯一写入入口, threading.Lock       │   │
+│  │  ┌──────────────────┐  ┌────────────────────────────┐   │   │
+│  │  │  embedding 锁外   │  │  自动关联检测 + 去重       │   │   │
+│  │  │  预计算(无阻塞)   │  │  cosine 0.93 阈值合并     │   │   │
+│  │  └──────────────────┘  └────────────────────────────┘   │   │
+│  └──────────────────────────┬──────────────────────────────┘   │
+│                             │                                   │
+│  ┌─────────────────────────▼──────────────────────────────┐   │
+│  │  DatabaseManager (M10) — ChromaDB 数据层               │   │
+│  │  CRUD / 分类聚合 / 搜索 / KB 隔离 (kb_{id} 集合)       │   │
+│  └────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>模块依赖关系</h3>
+<pre style="font-family:monospace;font-size:13px;background:#fff;padding:12px;border-radius:4px;border:1px solid #e2e8f0">
+  ┌──────┐  ┌──────┐  ┌──────┐  ┌────────┐  ┌──────┐
+  │  M5  │  │  M7  │  │ M10  │  │  M11   │  │  M3  │  ← 无依赖
+  │ KB   │  │Settng│  │Service│  │History │  │PDF   │
+  └──────┘  └──────┘  └──┬───┘  └────────┘  └──────┘
+                         │ (M10 是 M6/M8/M9 的基础)
+              ┌──────────┼──────────┐
+              ▼          ▼          ▼
+          ┌──────┐  ┌──────┐  ┌──────────┐
+          │  M6  │  │  M8  │  │ M9 Agent │
+          │ Quiz │  │Chat* │  │ 导入管线  │
+          └──────┘  └──────┘  └──────────┘
+
+  ── 优化模块执行顺序 ──
+  M5 (KB Lock) → 并行 M1 + M3 + M10 → M6/M8/M9 (已有, 测试加固)
+  M4 → M2 (最后, 依赖全部完成)
+</pre>
+
+<!-- ============================================================ -->
+<h2>2. 模块详解</h2>
+
+<!-- ── M1 ── -->
+<h3>M1 · 前端 UI 组件化 <span class="badge badge-p0">P0</span></h3>
+<div class="box">
+<p><strong>当前状态：</strong>PicoCSS v2（CDN）+ 48+ 行手写 utility 类（<code>.flex</code>、<code>.gap-*</code>、<code>.mt-*</code> 等）+ 原生 JS 组件。vendor/ 目录存在 alpinejs / daisyui / tailwind / marked 文件但未加载。</p>
+<p><strong>目标：</strong>替换为统一组件库，消除所有手写工具类和 inline style。</p>
+<p><strong>组件替换清单：</strong></p>
+<table>
+<tr><th>当前实现</th><th>目标组件</th><th>位置</th></tr>
+<tr><td>手写 navbar + PicoCSS</td><td>组件库 header/nav</td><td>header</td></tr>
+<tr><td>手写 sidebar + 手写 +/- 交互</td><td>组件库 sidebar + nav-item</td><td>侧边栏</td></tr>
+<tr><td>手写 card div + utility</td><td>组件库 card</td><td>卡片详情</td></tr>
+<tr><td>手写 modal mask + display 控制</td><td>组件库 modal</td><td>Quiz/Edit/Settings</td></tr>
+<tr><td>手写 button</td><td>组件库 button (primary/ghost/error)</td><td>全部按钮</td></tr>
+<tr><td>原生 input/textarea/select</td><td>组件库 input/select/textarea</td><td>搜索/编辑/设置</td></tr>
+<tr><td>手写 spinner</td><td>组件库 spinner</td><td>加载动画</td></tr>
+</table>
+<p><strong>迁移策略：</strong>一次一个组件替换，不 rewrite 整个文件。每替换一个组件后验证交互不坏。</p>
+</div>
+
+<!-- ── M2 ── -->
+<h3>M2 · 测试集补全 ≥ 100 <span class="badge badge-p0">P0</span></h3>
+<div class="box">
+<p><strong>新增测试方向：</strong></p>
+<ul>
+<li>KB 隔离 + 并发上传测试</li>
+<li>作业 enrich 测试</li>
+<li>Agent ReAct 多轮 + 工具调用测试</li>
+<li>前端集成测试（DOOM 存在性 + 交互）</li>
+</ul>
+<p><strong>当前覆盖（v1）：</strong>~73 个用例（8 个测试文件）。目标 ≥ 100。</p>
+</div>
+
+<!-- ── M3 ── -->
+<h3>M3 · PDF 解析容错 <span class="badge badge-p1">P1</span></h3>
+<div class="box">
+<p><strong>改动点：</strong></p>
+<ul>
+<li><code>tools.py::_parse_pdf</code> — 损坏 PDF 打开异常捕获，降级到 PIL+OCR</li>
+<li>单页 30s 超时（已有，验证有效）</li>
+<li>解析进度通过 <code>_tasks</code> 更新 + WebSocket 推送</li>
+<li><code>DocumentScanner</code> — 跳过空白页/封面/目录</li>
+</ul>
+</div>
+
+<!-- ── M4 ── -->
+<h3>M4 · 加载/空/错误状态 <span class="badge badge-p1">P1</span></h3>
+<div class="box">
+<table>
+<tr><th>场景</th><th>当前状态</th><th>目标</th></tr>
+<tr><td>上传文件</td><td>spinner</td><td>+进度百分比 + 失败 Retry</td></tr>
+<tr><td>Quiz 生成</td><td>无声等待</td><td>spinner + 超时提示 (60s → "生成超时")</td></tr>
+<tr><td>KB 切换</td><td>无声切换</td><td>spinner + 完成提示</td></tr>
+<tr><td>搜索</td><td>无声搜索</td><td>spinner + 空结果 "无匹配卡片"</td></tr>
+<tr><td>网络错误</td><td>alert()</td><td>内联错误消息 + Retry 按钮</td></tr>
+</table>
+</div>
+
+<!-- ── M5 ── -->
+<h3>M5 · KB 隔离加固 <span class="badge badge-p0">P0</span></h3>
+<div class="box">
+<p><strong>已有锁覆盖：</strong><code>database.py::DatabaseManager</code> 已有 <code>collection_lock</code>（threading.Lock）。</p>
+<p><strong>验证：</strong><code>knowledgebase.py::switch_kb</code> + <code>upload.py::_run_import_sync</code> 获取同一把锁。</p>
+</div>
+
+<!-- ── M6 ── -->
+<h3>M6 · Quiz & Mastery 系统 <span class="badge badge-core">Core</span></h3>
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/routes/quiz.py</code>（298 行）</p>
+<p><strong>端点（5 个）：</strong></p>
+<table>
+<tr><th>端点</th><th>方法</th><th>输入</th><th>输出</th><th>副作用</th></tr>
+<tr><td><code>/api/quiz/generate/{card_id}</code></td><td>POST</td><td>card_id</td><td>3-5 道简答题</td><td>LLM</td></tr>
+<tr><td><code>/api/quiz/grade</code></td><td>POST</td><td>card_id + answers[]</td><td>score/comment/reference</td><td>LLM + mastery</td></tr>
+<tr><td><code>/api/quiz/merge/{card_id}</code></td><td>POST</td><td>card_id + answers[]</td><td>更新后的卡片</td><td>LLM + ChromaDB</td></tr>
+<tr><td><code>/api/quiz/exam</code></td><td>POST</td><td>card_ids[]</td><td>综合题 5-8 道</td><td>LLM + mastery</td></tr>
+<tr><td><code>/api/quiz/mastery/{card_id}</code></td><td>GET</td><td>card_id</td><td>mastery_pct/attempts/score</td><td>—</td></tr>
+<tr><td><code>/api/quiz/mastery/batch</code></td><td>GET</td><td>card_ids (CSV)</td><td>{mastery: dict}</td><td>—</td></tr>
+</table>
+<p><strong>已知约束：</strong><code>_mastery</code> 字典进程内存储，重启丢失。后续需持久化。</p>
+</div>
+
+<!-- ── M7 ── -->
+<h3>M7 · Settings 配置管理 <span class="badge badge-core">Core</span></h3>
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/routes/settings.py</code>（90 行）</p>
+<p><strong>端点：</strong></p>
+<table>
+<tr><th>端点</th><th>方法</th><th>说明</th></tr>
+<tr><td><code>/api/settings/</code></td><td>GET</td><td>读取全部 .env 配置 + 描述</td></tr>
+<tr><td><code>/api/settings/</code></td><td>POST</td><td>更新单条配置（key → value）</td></tr>
+<tr><td><code>/api/settings/batch</code></td><td>POST</td><td>批量更新多条配置</td></tr>
+</table>
+<p><strong>可配置项（29 个 key）：</strong>LLM 供应商/模型/温度/超时、Embedding 模式、ChromaDB 路径、Agent 重试/超时等。</p>
+</div>
+
+<!-- ── M8 ── -->
+<h3>M8 · WebSocket Chat & 双模式 <span class="badge badge-core">Core</span></h3>
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/routes/chat.py</code>（177 行）+ <code>bobanana/agent_react.py</code>（245 行）</p>
+<p><strong>核心组件：</strong></p>
+<ul>
+<li><code>ConnectionManager</code> — WebSocket 连接管理，支持 <code>connect/disconnect/send/broadcast</code></li>
+<li><code>make_progress_callback</code> — 进度事件回调，<code>call_soon_threadsafe</code> 从后台线程推送到 WebSocket</li>
+<li><strong>Ask 模式</strong> — 知识库检索 + LLM 回答，不调用工具</li>
+<li><strong>Agent 模式</strong> — CoT + ReAct 循环：Thought→Action→Observation→Final Answer，最多 6 轮</li>
+</ul>
+<p><strong>端点：</strong><code>ws://host:port/ws/chat</code></p>
+<p><strong>消息格式：</strong></p>
+<ul>
+<li>接收：<code>{type: "message", content: "...", data?: {mode: "ask"|"agent"}}</code></li>
+<li>发送：<code>{type: "response"|"progress"|"error", content: "...", data?: {...}}</code></li>
+</ul>
+</div>
+
+<!-- ── M9 ── -->
+<h3>M9 · Agent 导入 Pipeline <span class="badge badge-core">Core</span></h3>
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/agent.py</code>（367 行）+ <code>bobanana/tools.py</code>（438 行）</p>
+<p><strong>三阶段流水线：</strong></p>
+<pre style="font-family:monospace;font-size:13px;background:#f0f4f8;padding:12px;border-radius:4px">
+第1阶段: DocumentScanner 预扫描
+↓  跳过空白页、封面、目录 → 输出有效区间 [(1,3), (5,8), …]
+第2阶段: 智能提取 (3 线程并发)
+├─ 短区间(≤2页) → 逐页 LLM 提取 (SYSTEM_EXTRACT)
+└─ 长区间(≥3页) → 聚合后 LLM 提取 (AGGREGATE_EXTRACT)
+第3阶段: 增量入库
+   逐条 CardCreate → CardService.create_card (含去重 + 关联)
+</pre>
+<p><strong>Homework 模式：</strong>上传作业后，提取的知识点匹配已有卡片（按标题/别名），将新内容 enrich 进原卡片。</p>
+<p><strong>LLM JSON 解析容错：</strong><code>_parse_llm_json</code> 有 4 层 fallback：代码块剥离 → 单引号修复 → 尾逗号清理 → 截断补全。</p>
+</div>
+
+<!-- ── M10 ── -->
+<h3>M10 · Card CRUD Service Layer <span class="badge badge-core">Core</span></h3>
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/service/card_service.py</code>（312 行）+ <code>bobanana/database.py</code>（196 行）</p>
+<p><strong>架构设计：</strong></p>
+<pre style="font-family:monospace;font-size:13px;background:#f0f4f8;padding:12px;border-radius:4px">
+CardService 单例
+├─ 读操作（无锁）: get / list / search / categories
+├─ 写操作（threading.Lock 序列化）
+│  ├─ embedding 锁外预计算 (避免阻塞)
+│  ├─ create / update / delete / batch_import
+│  └─ deduplicate (cosine > 0.93 合并 + 删除)
+├─ 同步方法 (供 Agent 线程): *_sync()
+│  └─ asyncio.run() 跨事件循环
+└─ 关联检测: _detect_and_link (锁外)
+   └─ 标题/别名匹配 → 双向 related_cards 更新
+
+DatabaseManager 单例
+├─ ChromaDB 持久化 (HNSW 索引)
+├─ CRUD / search / categories
+├─ KB 隔离: kb_{id} 集合
+└─ collection_lock: threading.Lock
+</pre>
+<p><strong>嵌入模型：</strong>支持 openai / sentence-transformers 两种，通过 <code>config.py</code> 的 <code>EMBEDDING_PROVIDER</code> 切换。</p>
+</div>
+
+<!-- ── M11 ── -->
+<h3>M11 · Browse History <span class="badge badge-core">P1 骨架</span></h3>
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/routes/history.py</code>（32 行）</p>
+<p><strong>端点：</strong></p>
+<table>
+<tr><th>端点</th><th>方法</th><th>说明</th></tr>
+<tr><td><code>/api/history</code></td><td>GET</td><td>获取最近 100 条浏览历史</td></tr>
+<tr><td><code>/api/history</code></td><td>POST</td><td>记录一条浏览历史</td></tr>
+</table>
+<p><strong>当前实现：</strong>进程内内存列表。P1 骨架，重启丢失。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Agent 工具清单</h2>
+
+<div class="box">
+<p><strong>文件：</strong><code>bobanana/tools_schema.py</code>（340 行）— 12 个 Function Calling 工具定义</p>
+<table>
+<tr><th>工具名</th><th>说明</th><th>必填参数</th></tr>
+<tr><td><code>search_knowledge</code></td><td>语义搜索知识库</td><td>query</td></tr>
+<tr><td><code>list_categories</code></td><td>列出全部分类</td><td>—</td></tr>
+<tr><td><code>get_card</code></td><td>获取卡片完整内容</td><td>card_id_or_title</td></tr>
+<tr><td><code>create_card</code></td><td>创建卡片（可 AI 自动填充）</td><td>title</td></tr>
+<tr><td><code>update_card</code></td><td>更新卡片内容</td><td>card_id_or_title</td></tr>
+<tr><td><code>delete_card</code></td><td>删除卡片</td><td>card_id_or_title</td></tr>
+<tr><td><code>upload_document</code></td><td>上传文档并自动导入</td><td>file_path</td></tr>
+<tr><td><code>start_quiz</code></td><td>为卡片生成 Quiz 题目</td><td>card_id</td></tr>
+<tr><td><code>grade_quiz</code></td><td>评分 + 反馈</td><td>card_id, answers</td></tr>
+<tr><td><code>create_exam</code></td><td>多卡片组卷</td><td>card_ids</td></tr>
+<tr><td><code>get_mastery</code></td><td>获取掌握度</td><td>card_id</td></tr>
+<tr><td><code>web_search_enrich</code></td><td>网络搜索补充知识</td><td>query</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Risk 7 维分析</h2>
+
+<table>
+<tr><th>维度</th><th>M1 UI</th><th>M2 测试</th><th>M3 PDF</th><th>M4 状态</th><th>M5 KB</th><th>M6 Quiz</th><th>M7 设置</th><th>M8 聊天</th><th>M9 导入</th><th>M10 服务</th><th>M11 历史</th></tr>
+<tr><td><strong>技术债</strong></td><td>-</td><td>夹具慢</td><td>-</td><td>-</td><td>锁已有</td><td>_mastery 进程内</td><td>-</td><td>-</td><td>-</td><td>sync 嵌套</td><td>内存存储</td></tr>
+<tr><td><strong>回滚</strong></td><td>保留.bak</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>.env 备份</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td><strong>灰度</strong></td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td><strong>熔断</strong></td><td>-</td><td>-</td><td>OCR降级</td><td>超时60s</td><td>-</td><td>LLM超时</td><td>-</td><td>Agent 6轮限</td><td>大文档并发</td><td>-</td><td>-</td></tr>
+<tr><td><strong>监控</strong></td><td>-</td><td>-</td><td>进度日志</td><td>-</td><td>切换日志</td><td>LLM调用日志</td><td>写.env日志</td><td>连接日志</td><td>进度回调</td><td>_pending_fails</td><td>-</td></tr>
+<tr><td><strong>容错</strong></td><td>-</td><td>-</td><td>损坏PDF</td><td>Retry</td><td>锁超时</td><td>404 处理</td><td>key校验</td><td>未知工具</td><td>JSON fallback</td><td>批量事务</td><td>-</td></tr>
+<tr><td><strong>安全</strong></td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>prompt注入</td><td>Key日志截断</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>5. Task 清单</h2>
+
+<div class="task-card">
+<div style="display:flex;justify-content:space-between">
+<strong>T1 · 引入组件库 + 替换 Navbar/Sidebar</strong>
+<span class="badge badge-p0">P0</span>
+</div>
+<div class="meta">文件: static/index.html · 依赖: 无 · 复杂度: 中</div>
+<div>验收: 侧边栏可滚，展开收起可用，无 inline style</div>
+</div>
+
+<div class="task-card">
+<div style="display:flex;justify-content:space-between">
+<strong>T2 · 替换 Card/Modal/Button/Input 组件</strong>
+<span class="badge badge-p0">P0</span>
+</div>
+<div class="meta">文件: static/index.html · 依赖: T1 · 复杂度: 中</div>
+<div>验收: 卡片详情/Quiz Modal/Edit Modal/Settings 全部使用组件库</div>
+</div>
+
+<div class="task-card">
+<div style="display:flex;justify-content:space-between">
+<strong>T3 · KB 隔离加固验证</strong>
+<span class="badge badge-p0">P0</span>
+</div>
+<div class="meta">文件: bobanana/knowledgebase.py, bobanana/database.py · 依赖: 无 · 复杂度: 低</div>
+<div>验收: 验证已有锁覆盖 switch_kb + upload，测试通过</div>
+</div>
+
+<div class="task-card">
+<div style="display:flex;justify-content:space-between">
+<strong>T4 · PDF 解析容错加固</strong>
+<span class="badge badge-p1">P1</span>
+</div>
+<div class="meta">文件: bobanana/tools.py · 依赖: 无 · 复杂度: 中</div>
+<div>验收: 损坏 PDF 不卡死，全图片 PDF 走 OCR</div>
+</div>
+
+<div class="task-card">
+<div style="display:flex;justify-content:space-between">
+<strong>T5 · 加载/空/错误状态 UI</strong>
+<span class="badge badge-p1">P1</span>
+</div>
+<div class="meta">文件: static/index.html · 依赖: T2 · 复杂度: 低</div>
+<div>验收: 5 个场景全部有 spinner + 超时 + Retry</div>
+</div>
+
+<div class="task-card">
+<div style="display:flex;justify-content:space-between">
+<strong>T6 · 测试集 ≥ 100 用例</strong>
+<span class="badge badge-p0">P0</span>
+</div>
+<div class="meta">文件: tests/*.py · 依赖: T1-T5 · 复杂度: 中</div>
+<div>验收: python -m pytest tests/ --collect-only ≥ 100</div>
+</div>
+
+<!-- ── 核心系统加固任务 ── -->
+<div class="task-card" style="border-left:4px solid #4299e1">
+<div style="display:flex;justify-content:space-between">
+<strong>T7 · Quiz Mastery 持久化</strong>
+<span class="badge badge-p2">P2</span>
+</div>
+<div class="meta">文件: bobanana/routes/quiz.py · 依赖: M10 · 复杂度: 中</div>
+<div>验收: 掌握度在服务重启后不丢失</div>
+</div>
+
+<div class="task-card" style="border-left:4px solid #4299e1">
+<div style="display:flex;justify-content:space-between">
+<strong>T8 · History 持久化</strong>
+<span class="badge badge-p2">P2</span>
+</div>
+<div class="meta">文件: bobanana/routes/history.py · 依赖: M10 · 复杂度: 低</div>
+<div>验收: 浏览历史在重启后保留</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>6. 架构决策记录</h2>
+
+<div class="box">
+<p><strong>ADR-1：选择 2+1 方案 (a) 按模块拆</strong></p>
+<p>理由：M1-M11 边界清晰，每个 task 对应一个模块，验收条件独立。</p>
+</div>
+
+<div class="box">
+<p><strong>ADR-2：组件库通过 CDN 引入，不打包构建</strong></p>
+<p>理由：当前项目无前端构建工具链，CDN 方式最低侵入。</p>
+</div>
+
+<div class="box">
+<p><strong>ADR-3：测试使用已存在的 pytest 框架</strong></p>
+<p>理由：已有 pytest 用例和 fixture，复用 conftest。</p>
+</div>
+
+<div class="box">
+<p><strong>ADR-4：CardService 单例 + threading.Lock 序列化写操作</strong></p>
+<p>理由：ChromaDB 客户端非线程安全。锁外计算 embedding 可避免 CPU 阻塞其他写请求。跨事件循环通过 asyncio.run() 桥接（已知嵌套调用风险）。</p>
+</div>
+
+<div class="box">
+<p><strong>ADR-5：Agent ReAct 使用本地循环而非外部 Agent 框架</strong></p>
+<p>理由：避免引入 LangChain/AutoGen 等重型依赖。6 轮循环硬限制 + 超时兜底，防止无限循环。</p>
+</div>
+
+<div class="box">
+<p><strong>ADR-6：掌握度 / 历史使用进程内存储（P1 骨架）</strong></p>
+<p>理由：简化 MVP 实现。后续计划迁移到 ChromaDB metadata 或独立的 SQLite 表。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>7. 任务执行顺序</h2>
+<pre style="font-family:monospace;font-size:14px;background:#1e293b;color:#e2e8f0;padding:16px;border-radius:8px">
+  ┌──────┐  ┌──────┐  ┌───────┐
+  │  T3  │  │ T1*  │  │  T4   │  ← 可并行
+  │KB锁  │  │ UI   │  │ PDF   │
+  └──┬───┘  └──┬───┘  └───────┘
+     │         │
+     │     ┌───▼───┐
+     │     │  T2   │ Card/Modal
+     │     └───┬───┘
+     │         │
+     │     ┌───▼───┐
+     │     │  T5   │ Loading States
+     │     └───┬───┘
+     └─────────┼──────────┐
+          ┌────▼────┐ ┌───▼────┐
+          │  T6     │ │ T7/T8  │ 测试 + 持久化
+          │ Tests   │ │ (P2)   │
+          └─────────┘ └────────┘
+
+  *T1 组件库选型需先确认：EUI-NEO / DaisyUI / 其他
+</pre>
+
+<p style="margin-top:40px;font-size:13px;color:#a0aec0;text-align:center">— 架构文档 v2.0 · 覆盖全系统 11 模块 —</p>
+
+</body>
+</html>

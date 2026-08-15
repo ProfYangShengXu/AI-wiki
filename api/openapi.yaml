@@ -1,0 +1,1548 @@
+openapi: 3.0.3
+info:
+  title: StudyWiki-Agent API
+  version: 1.0.0
+  description: |
+    StudyWiki-Agent 服务契约 —— 基于 LangChain + LangGraph 的可增长本地 Wiki 知识库 API。
+
+    统一约定:
+    - 成功响应通常为 `{"status":"success","data":...}`（部分端点直接返回该字典，部分经 `ApiResponse` 包装并额外携带 `message`/`error_code`/`timestamp`）。
+    - 错误响应统一为 `{"status":"error","error_code":"SW-...","message":"...","timestamp":"..."}`。
+    - 除 `/health` 返回 `{"status":"ok","cards_count":N}` 外，业务接口顶层均含 `status` 字段。
+
+    鉴权:
+    - 当 `.env` 配置 `STUDYWIKI_AUTH_TOKEN` 时启用，业务 API 需携带 `Authorization: Bearer <token>`。
+    - public 路径（无需鉴权）: `/`、`/health`、`/docs`、`/openapi.json`、`/api/openapi.yaml`、`/api/bootstrap/status`、`/api/bootstrap/test`、`/api/bootstrap/configure`，以及 `/static/*`。
+    - 未授权返回 401，错误码 `SW-AUTH-001`。
+
+    > 本文档为手写契约，与 `api/openapi.yaml` 一致；实际运行时的自动导出见 `/openapi.json`。
+servers:
+  - url: http://127.0.0.1:8000
+    description: 本地开发服务器
+tags:
+  - name: health
+    description: 健康检查与根路由
+  - name: bootstrap
+    description: 首次进入灰屏强制配置 API Key
+  - name: cards
+    description: 知识卡片 CRUD / 搜索 / 生成 / 去重
+  - name: categories
+    description: 分类列表
+  - name: history
+    description: 浏览历史
+  - name: upload
+    description: 文件上传与后台解析任务
+  - name: chat
+    description: WebSocket 对话
+  - name: quiz
+    description: 题目生成 / AI 评分 / 掌握度
+  - name: settings
+    description: 运行时 LLM/Embedding 配置
+  - name: knowledgebase
+    description: 多知识库管理
+
+paths:
+  /:
+    get:
+      tags: [health]
+      summary: 根路由 — 返回前端页面
+      security: []
+      responses:
+        "200":
+          description: 返回 `static/index.html`（存在时）或服务信息 JSON
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service: { type: string }
+                  version: { type: string }
+            text/html:
+              schema:
+                type: string
+
+  /health:
+    get:
+      tags: [health]
+      summary: 健康检查
+      security: []
+      responses:
+        "200":
+          description: 服务与数据库正常
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, cards_count]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  cards_count: { type: integer }
+        "503":
+          description: 数据库不可用
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [error] }
+                  message: { type: string }
+
+  /api/logs:
+    get:
+      tags: [health]
+      summary: 获取最近运行日志
+      parameters:
+        - name: level
+          in: query
+          required: false
+          schema: { type: string }
+          description: 可选日志级别过滤
+        - name: n
+          in: query
+          required: false
+          schema: { type: integer, default: 100 }
+      responses:
+        "200":
+          description: 最近日志列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  data:
+                    type: array
+                    items: { type: string }
+
+  /api/openapi.yaml:
+    get:
+      tags: [health]
+      summary: 返回手写 OpenAPI 契约
+      security: []
+      responses:
+        "200":
+          description: 本契约文档（YAML）
+          content:
+            application/yaml:
+              schema: { type: string }
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # ── Bootstrap ──────────────────────────────────────────
+  /api/bootstrap/status:
+    get:
+      tags: [bootstrap]
+      summary: 查询灰屏状态
+      description: 永不返回完整 API Key。
+      security: []
+      responses:
+        "200":
+          description: 灰屏状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/BootstrapStatus" }
+
+  /api/bootstrap/test:
+    post:
+      tags: [bootstrap]
+      summary: 验证 API Key（不落盘）
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BootstrapConfigRequest" }
+      responses:
+        "200":
+          description: "验证结果（status 为 success 或 error）"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/BootstrapTestResult" }
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/bootstrap/configure:
+    post:
+      tags: [bootstrap]
+      summary: 验证成功后写入 .env 并解除灰屏
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BootstrapConfigRequest" }
+      responses:
+        "200":
+          description: "配置结果（status 为 success 或 error）"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/BootstrapTestResult" }
+        "400":
+          $ref: "#/components/responses/Error"
+
+  # ── Cards ──────────────────────────────────────────────
+  /api/cards:
+    get:
+      tags: [cards]
+      summary: 列出卡片（分页 + 分类过滤）
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema: { type: string }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 50, minimum: 1, maximum: 1000 }
+      responses:
+        "200":
+          description: 卡片列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/CardListResponse" }
+    post:
+      tags: [cards]
+      summary: 创建卡片
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardCreate" }
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/CardResponse" }
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/cards/search:
+    get:
+      tags: [cards]
+      summary: 语义搜索卡片
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cards:
+                            type: array
+                            items: { $ref: "#/components/schemas/CardResponse" }
+                          total: { type: integer }
+
+  /api/cards/generate:
+    post:
+      tags: [cards]
+      summary: LLM 生成知识卡片内容
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardCreate" }
+      responses:
+        "201":
+          description: 生成并创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/CardResponse" }
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/cards/deduplicate:
+    post:
+      tags: [cards]
+      summary: 语义去重（合并相似卡片）
+      responses:
+        "200":
+          description: 去重统计
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          merged: { type: integer }
+                          deleted: { type: integer }
+
+  /api/cards/{card_id}:
+    get:
+      tags: [cards]
+      summary: 获取单张卡片
+      parameters:
+        - $ref: "#/components/parameters/CardId"
+      responses:
+        "200":
+          description: 卡片详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/CardResponse" }
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [cards]
+      summary: 更新卡片（部分字段）
+      parameters:
+        - $ref: "#/components/parameters/CardId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/CardResponse" }
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [cards]
+      summary: 删除卡片
+      parameters:
+        - $ref: "#/components/parameters/CardId"
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # ── Categories ─────────────────────────────────────────
+  /api/categories:
+    get:
+      tags: [categories]
+      summary: 列出所有分类名
+      responses:
+        "200":
+          description: 分类列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          categories:
+                            type: array
+                            items: { type: string }
+        "405":
+          $ref: "#/components/responses/Error"
+
+  # ── History ────────────────────────────────────────────
+  /api/history:
+    get:
+      tags: [history]
+      summary: 获取浏览历史（最近 200 条）
+      responses:
+        "200":
+          description: 历史列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          history:
+                            type: array
+                            items: { $ref: "#/components/schemas/HistoryRecord" }
+    post:
+      tags: [history]
+      summary: 记录一条浏览历史
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HistoryRecord" }
+      responses:
+        "200":
+          description: 记录成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+
+  # ── Upload ─────────────────────────────────────────────
+  /api/upload:
+    post:
+      tags: [upload]
+      summary: 上传文档并后台解析
+      description: |
+        支持扩展名: `.pdf .docx .doc .md .txt`；大小上限 100MB。
+        上传后立即返回任务 ID，解析在后台异步执行。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                file_type:
+                  type: string
+                  enum: [course, hw]
+                  default: course
+                kb_id:
+                  type: string
+                  default: ""
+                  description: 目标知识库 ID（空为默认库）
+      responses:
+        "200":
+          description: 上传成功，后台解析中
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/UploadResponse" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+
+  /api/upload/status/{task_id}:
+    get:
+      tags: [upload]
+      summary: 查询上传任务状态
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 任务状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/UploadTaskStatus" }
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/upload/cancel/{task_id}:
+    post:
+      tags: [upload]
+      summary: 取消上传任务(幂等)
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 当前任务状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/UploadTaskStatus" }
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/upload/resume/{task_id}:
+    post:
+      tags: [upload]
+      summary: 续跑失败/已取消的导入任务
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 续跑启动结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/UploadTaskStatus" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # ── 备份 / 恢复 (Phase 2 §4) ───────────────────────────
+  /api/backup/create:
+    post:
+      tags: [backup]
+      summary: 创建备份(snapshots chroma_db + uploads)
+      responses:
+        "200":
+          description: 备份文件信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name: { type: string }
+                          path: { type: string }
+                          size: { type: integer }
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/backup/list:
+    get:
+      tags: [backup]
+      summary: 列出全部备份
+      responses:
+        "200":
+          description: 备份列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          backups: { type: array, items: { type: object } }
+
+  /api/backup/restore/{name}:
+    post:
+      tags: [backup]
+      summary: 恢复备份(dry_run=true 仅返回计划)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 恢复结果或计划
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { type: object }
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  # ── 指标 (Phase 2 §5) ─────────────────────────────────
+  /api/metrics:
+    get:
+      tags: [metrics]
+      summary: 内存累积指标快照(uptime/LLM 调用/导入/检索/审批等)
+      responses:
+        "200":
+          description: 指标快照
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { type: object }
+
+  # ── 设备配对 (Phase 2 §7.1) ───────────────────────────
+  /api/pair/code:
+    post:
+      tags: [pair]
+      summary: 生成一次性 6 位配对码(TTL 默认 300s)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ttl_sec: { type: integer, default: 300 }
+      responses:
+        "200":
+          description: 配对码
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          code: { type: string, pattern: "^\\d{6}$" }
+                          ttl_sec: { type: integer }
+                          expires_at: { type: string }
+
+  /api/pair/verify:
+    post:
+      tags: [pair]
+      summary: 校验配对码并登记设备(一次性)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, device_id]
+              properties:
+                code: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: 配对成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          paired: { type: boolean }
+                          device_id: { type: string }
+                          paired_devices: { type: integer }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/pair/status:
+    get:
+      tags: [pair]
+      summary: 配对状态与已登记设备(脱敏)
+      responses:
+        "200":
+          description: 配对状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          enabled: { type: boolean }
+                          active_code: { type: boolean }
+                          paired_devices: { type: integer }
+
+  # ── Quiz ───────────────────────────────────────────────
+  /api/quiz/generate/{card_id}:
+    post:
+      tags: [quiz]
+      summary: 为卡片生成 3-5 道简答题
+      parameters:
+        - $ref: "#/components/parameters/CardId"
+      responses:
+        "200":
+          description: 题目列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/QuizGenerateResult" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/quiz/grade:
+    post:
+      tags: [quiz]
+      summary: AI 评分简答题
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuizSubmission" }
+      responses:
+        "200":
+          description: 评分结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/QuizGradeResult" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/quiz/merge/{card_id}:
+    post:
+      tags: [quiz]
+      summary: 将 Quiz 问答与评分反馈融合回卡片
+      parameters:
+        - $ref: "#/components/parameters/CardId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuizSubmission" }
+      responses:
+        "200":
+          description: 融合后的卡片
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          card: { $ref: "#/components/schemas/CardResponse" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/quiz/exam:
+    post:
+      tags: [quiz]
+      summary: 智能组卷（跨知识点综合题）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExamRequest" }
+      responses:
+        "200":
+          description: 试卷题目
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ExamResult" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/quiz/mastery/{card_id}:
+    get:
+      tags: [quiz]
+      summary: 获取单张卡片掌握度
+      parameters:
+        - $ref: "#/components/parameters/CardId"
+      responses:
+        "200":
+          description: 掌握度
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  data: { $ref: "#/components/schemas/MasteryResult" }
+
+  /api/quiz/mastery/batch:
+    get:
+      tags: [quiz]
+      summary: 批量获取掌握度
+      parameters:
+        - name: card_ids
+          in: query
+          required: false
+          schema: { type: string }
+          description: 逗号分隔的卡片 ID 列表
+      responses:
+        "200":
+          description: 批量掌握度
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mastery:
+                            type: object
+                            additionalProperties: { type: integer }
+
+  # ── Settings ───────────────────────────────────────────
+  /api/settings/:
+    get:
+      tags: [settings]
+      summary: 读取当前配置（API Key 已脱敏）
+      responses:
+        "200":
+          description: 配置项与说明
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/SettingsResponse" }
+    post:
+      tags: [settings]
+      summary: 更新单条配置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SettingsUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  message: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/settings/batch:
+    post:
+      tags: [settings]
+      summary: 批量更新配置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: "#/components/schemas/SettingsUpdate" }
+      responses:
+        "200":
+          description: 批量更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  message: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+
+  # ── Knowledgebase ──────────────────────────────────────
+  /api/kb/list:
+    get:
+      tags: [knowledgebase]
+      summary: 列出所有知识库 + 当前库
+      responses:
+        "200":
+          description: 知识库列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  data: { $ref: "#/components/schemas/KBListResponse" }
+
+  /api/kb/create:
+    post:
+      tags: [knowledgebase]
+      summary: 创建知识库
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KBCreate" }
+      responses:
+        "200":
+          description: 新建知识库元信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  data: { $ref: "#/components/schemas/KBMeta" }
+
+  /api/kb/switch/{kb_id}:
+    post:
+      tags: [knowledgebase]
+      summary: 切换当前知识库
+      parameters:
+        - $ref: "#/components/parameters/KbId"
+      responses:
+        "200":
+          description: 切换结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  data: { $ref: "#/components/schemas/KBSwitchResponse" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /api/kb/{kb_id}:
+    delete:
+      tags: [knowledgebase]
+      summary: 删除知识库（默认库不可删除）
+      parameters:
+        - $ref: "#/components/parameters/KbId"
+      responses:
+        "200":
+          description: 已删除
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  message: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/kb/rename/{kb_id}:
+    post:
+      tags: [knowledgebase]
+      summary: 重命名知识库
+      parameters:
+        - $ref: "#/components/parameters/KbId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KBRename" }
+      responses:
+        "200":
+          description: 重命名后的元信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [success] }
+                  data: { $ref: "#/components/schemas/KBMeta" }
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # ── WebSocket ──────────────────────────────────────────
+  /ws/chat:
+    get:
+      tags: [chat]
+      summary: 对话 WebSocket
+      description: |
+        客户端发送 `message` 类型消息（`data.mode` 可为 `ask`（仅检索知识库）或 `agent`（ReAct 循环））。
+        服务端推送 `response`（最终回答）、`progress`（阶段进度）、`error`（错误），
+        以及 Phase 2 流式/工具/审批/会话事件（llm.delta / tool.called / tool.result /
+        approval_required / session.started / session.done / session.error）。
+        连接建立后服务端先发送 session.started 与一条欢迎 `response`。
+      responses:
+        "101":
+          description: 协议升级为 WebSocket
+      x-websocket:
+        messageTypes:
+          clientToServer:
+            - type: message
+              content: 用户输入
+              data:
+                mode: ask | agent
+            - type: approval
+              description: 审批答复（data.approval_id + data.approved）
+          serverToClient:
+            - type: response
+              description: 最终回答文本
+            - type: progress
+              description: "阶段进度（stage: thinking / agent 等）"
+            - type: error
+              description: 错误信息
+            - type: llm.delta
+              description: 流式增量（data.delta）
+            - type: tool.called
+              description: 工具调用开始（data.tool / data.args）
+            - type: tool.result
+              description: 工具调用结果（data.tool / data.ok / data.summary）
+            - type: approval_required
+              description: 危险操作审批请求（data.approval_id / data.tool / data.args，60s 超时自动拒绝）
+            - type: session.started
+              description: 会话开始（data.session_id）
+            - type: session.done
+              description: 会话正常结束（data.session_id）
+            - type: session.error
+              description: 会话异常结束（data.session_id / data.message）
+            - type: card_preview
+              description: 预留：卡片预览（当前实现未启用）
+            - type: card_update
+              description: 预留：卡片更新（当前实现未启用）
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 当 STUDYWIKI_AUTH_TOKEN 配置时启用；public 路径无需携带。
+
+  parameters:
+    CardId:
+      name: card_id
+      in: path
+      required: true
+      schema: { type: string }
+      description: 卡片 ID
+    KbId:
+      name: kb_id
+      in: path
+      required: true
+      schema: { type: string }
+      description: 知识库 ID
+
+  responses:
+    Error:
+      description: 统一错误响应
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationError:
+      description: 请求校验失败（FastAPI 默认结构）
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: array
+                items:
+                  type: object
+
+  schemas:
+    ApiResponse:
+      type: object
+      description: 统一 API 响应格式
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: object
+          nullable: true
+        message:
+          type: string
+          default: ""
+        error_code:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      description: 统一错误响应体
+      required: [status, error_code, message, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error_code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorCode:
+      type: string
+      description: |
+        统一错误码，格式 `SW-<DOMAIN>-<CODE>`。
+        数值后缀通常对应该错误建议的 HTTP 状态码。
+      enum:
+        - SW-AUTH-001
+        - SW-CARD-400
+        - SW-CARD-404
+        - SW-CARD-500
+        - SW-UPLOAD-400
+        - SW-UPLOAD-413
+        - SW-UPLOAD-500
+        - SW-QUIZ-400
+        - SW-QUIZ-404
+        - SW-QUIZ-500
+        - SW-TASK-404
+        - SW-SETTINGS-400
+        - SW-KB-400
+        - SW-KB-404
+        - SW-KB-500
+        - SW-BOOTSTRAP-400
+        - SW-BOOTSTRAP-401
+        - SW-BOOTSTRAP-429
+        - SW-BOOTSTRAP-UPSTREAM
+        - SW-BOOTSTRAP-TIMEOUT
+        - SW-BOOTSTRAP-NETWORK
+        - SW-AGENT-400
+        - SW-AGENT-429
+        - SW-LLM-503
+        - SW-BACKUP-404
+        - SW-BACKUP-500
+        - SW-PAIR-400
+        - SW-PAIR-401
+        - SW-PAIR-404
+        - SW-DB-507
+        - SW-GENERIC-400
+        - SW-GENERIC-401
+        - SW-GENERIC-403
+        - SW-GENERIC-404
+        - SW-GENERIC-405
+        - SW-GENERIC-409
+        - SW-GENERIC-413
+        - SW-GENERIC-422
+        - SW-GENERIC-500
+        - SW-GENERIC-502
+        - SW-GENERIC-503
+        - SW-GENERIC-504
+
+    Card:
+      type: object
+      description: 知识卡片核心模型（内部存储）
+      required: [id, title]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        aliases:
+          type: array
+          items: { type: string }
+        content: { type: string }
+        examples:
+          type: array
+          items: { type: string }
+        questions:
+          type: array
+          items: { type: string }
+        category: { type: string, default: 未分类 }
+        source_file: { type: string }
+        source_page: { type: integer }
+        related_cards:
+          type: array
+          items: { type: string }
+        mastery_attempts: { type: integer }
+        mastery_score: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CardCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        aliases:
+          type: array
+          items: { type: string }
+          default: []
+        content: { type: string, default: "" }
+        examples:
+          type: array
+          items: { type: string }
+          default: []
+        questions:
+          type: array
+          items: { type: string }
+          default: []
+        category: { type: string, default: 未分类 }
+        source_file: { type: string, default: "" }
+        source_page: { type: integer, default: 0 }
+        related_cards:
+          type: array
+          items: { type: string }
+          default: []
+
+    CardUpdate:
+      type: object
+      description: 更新卡片请求（所有字段可选）
+      properties:
+        title: { type: string, nullable: true }
+        aliases:
+          type: array
+          items: { type: string }
+          nullable: true
+        content: { type: string, nullable: true }
+        examples:
+          type: array
+          items: { type: string }
+          nullable: true
+        questions:
+          type: array
+          items: { type: string }
+          nullable: true
+        category: { type: string, nullable: true }
+        source_file: { type: string, nullable: true }
+        source_page: { type: integer, nullable: true }
+        related_cards:
+          type: array
+          items: { type: string }
+          nullable: true
+
+    CardResponse:
+      type: object
+      description: 卡片响应
+      required: [id, title, category, created_at, updated_at]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        aliases:
+          type: array
+          items: { type: string }
+        content: { type: string }
+        examples:
+          type: array
+          items: { type: string }
+        questions:
+          type: array
+          items: { type: string }
+        category: { type: string }
+        source_file: { type: string }
+        source_page: { type: integer }
+        related_cards:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CardListResponse:
+      type: object
+      properties:
+        cards:
+          type: array
+          items: { $ref: "#/components/schemas/CardResponse" }
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+
+    HistoryRecord:
+      type: object
+      required: [card_id, title, timestamp]
+      properties:
+        card_id: { type: string }
+        title: { type: string }
+        timestamp: { type: string }
+
+    UploadResponse:
+      type: object
+      properties:
+        task_id: { type: string }
+        filename: { type: string }
+        storage_name: { type: string }
+        size: { type: integer }
+
+    UploadTaskStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [processing, done, error]
+        message: { type: string }
+        imported: { type: integer }
+        failed: { type: integer }
+        cards:
+          type: array
+          items: { type: object }
+
+    QuizAnswer:
+      type: object
+      properties:
+        question: { type: string, default: "" }
+        answer: { type: string, default: "" }
+
+    QuizSubmission:
+      type: object
+      required: [card_id, answers]
+      properties:
+        card_id: { type: string }
+        answers:
+          type: array
+          items: { $ref: "#/components/schemas/QuizAnswer" }
+
+    QuizResult:
+      type: object
+      properties:
+        question: { type: string }
+        answer: { type: string }
+        score:
+          type: integer
+          minimum: 0
+          maximum: 10
+        comment: { type: string }
+        reference: { type: string, default: "" }
+
+    QuizGenerateResult:
+      type: object
+      properties:
+        card_id: { type: string }
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              question: { type: string }
+              ref_answer: { type: string }
+
+    QuizGradeResult:
+      type: object
+      properties:
+        card_id: { type: string }
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/QuizResult" }
+        total_score: { type: integer }
+        max_score: { type: integer }
+        mastery_pct: { type: integer }
+
+    ExamRequest:
+      type: object
+      required: [card_ids]
+      properties:
+        card_ids:
+          type: array
+          items: { type: string }
+
+    ExamResult:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              question: { type: string }
+              ref_answer: { type: string }
+              related_cards:
+                type: array
+                items: { type: string }
+        card_ids:
+          type: array
+          items: { type: string }
+
+    MasteryResult:
+      type: object
+      properties:
+        card_id: { type: string }
+        attempts: { type: integer }
+        score: { type: integer }
+        mastery_pct: { type: integer }
+
+    BootstrapConfigRequest:
+      type: object
+      required: [api_key]
+      properties:
+        provider:
+          type: string
+          enum: [deepseek, openai]
+          default: deepseek
+        api_key:
+          type: string
+          minLength: 8
+          maxLength: 512
+        base_url:
+          type: string
+          maxLength: 512
+          default: ""
+        model:
+          type: string
+          maxLength: 128
+          default: ""
+
+    BootstrapStatus:
+      type: object
+      properties:
+        required: { type: boolean }
+        provider: { type: string }
+        has_key: { type: boolean }
+        key_tail: { type: string }
+        base_url: { type: string }
+
+    BootstrapTestResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        provider: { type: string }
+        key_tail: { type: string }
+
+    SettingsUpdate:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string }
+        value: { type: string }
+
+    SettingsResponse:
+      type: object
+      properties:
+        settings:
+          type: object
+          additionalProperties: { type: string }
+        descriptions:
+          type: object
+          additionalProperties: { type: string }
+
+    KBCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+
+    KBRename:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+
+    KBMeta:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        created: { type: string, format: date-time }
+        card_count: { type: integer }
+
+    KBListResponse:
+      type: object
+      properties:
+        current: { type: string }
+        kbs:
+          type: array
+          items: { $ref: "#/components/schemas/KBMeta" }
+
+    KBSwitchResponse:
+      type: object
+      properties:
+        current: { type: string }
+        name: { type: string }
+        count: { type: integer }
+
+    WSMessage:
+      type: object
+      description: WebSocket 消息
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [message, response, progress, card_preview, card_update, error]
+        content:
+          type: string
+          default: ""
+        data:
+          type: object
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
