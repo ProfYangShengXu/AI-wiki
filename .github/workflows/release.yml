@@ -44,6 +44,15 @@ jobs:
           pyinstaller --onefile --name study-wiki-core
           --add-data "static;static" --add-data "api;api"
           main.py
+      - name: 代码签名(若配置了证书)
+        if: env.CODE_SIGN_PFX_BASE64 != ''
+        shell: pwsh
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PFX_PASSWORD: ${{ secrets.CODE_SIGN_PFX_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CODE_SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist\study-wiki-core.exe
       - uses: actions/upload-artifact@v4
         with:
           name: backend-exe
@@ -154,6 +163,15 @@ jobs:
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+      - name: 安装包代码签名(若配置了证书)
+        if: env.CODE_SIGN_PFX_BASE64 != ''
+        shell: pwsh
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PFX_PASSWORD: ${{ secrets.CODE_SIGN_PFX_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CODE_SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist\studywiki-setup.exe
       - uses: actions/upload-artifact@v4
         with:
           name: installer
