@@ -80,6 +80,30 @@ jobs:
       # 在仓库 Settings -> Secrets 配置签名证书与密钥，另加 release 工作流；
       # 此处暂不涉及，避免泄露签名材料。
 
+  backend-package:
+    name: backend-package (windows exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build study-wiki-core.exe
+        # 附带 static/ 与 api/openapi.yaml 数据文件(Windows 用 ";" 分隔)。
+        run: >
+          pyinstaller --onefile --name study-wiki-core
+          --add-data "static;static" --add-data "api;api"
+          main.py
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-wiki-core-exe
+          path: dist/study-wiki-core.exe
+
   real-llm:
     name: real-llm (manual)
     # 仅在手动 workflow_dispatch 触发时运行，避免 CI 消费真实大模型额度。
