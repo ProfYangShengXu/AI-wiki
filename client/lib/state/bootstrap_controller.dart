@@ -53,9 +53,9 @@ class BootstrapController extends Notifier<BootstrapState> {
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, message: '', isError: false);
-    // 后端 sidecar 冷启动需 10-20s(加载嵌入模型),这里带重试轮询,
+    // 后端 sidecar 冷启动需 10-20s(慢机器更久),这里带重试轮询,
     // 避免刚启动时灰屏直接报"无法连接"。
-    const maxAttempts = 10;
+    const maxAttempts = 20; // 20 × 3s = 60s 窗口
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         final status = await ref.read(apiClientProvider).getBootstrapStatus();

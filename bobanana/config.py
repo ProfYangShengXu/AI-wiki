@@ -11,11 +11,15 @@ load_dotenv()
 
 # ── 路径 ──────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-CHROMA_DB_DIR = BASE_DIR / "chroma_db"
+# 数据目录: 默认与程序同目录(便携版);安装版由客户端注入
+# STUDYWIki_DATA_DIR=%LOCALAPPDATA%\\StudyWiki-Agent\\data,
+# 避免往 Program Files 写数据导致权限拒绝、后端起不来。
+DATA_DIR: Path = Path(os.getenv("STUDYWIKI_DATA_DIR", str(BASE_DIR))).expanduser()
+UPLOAD_DIR = DATA_DIR / "uploads"
+CHROMA_DB_DIR = DATA_DIR / "chroma_db"
 STATIC_DIR = BASE_DIR / "static"
 VENDOR_DIR = STATIC_DIR / "vendor"
-LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR = DATA_DIR / "logs"
 
 # ── LLM 配置 ─────────────────────────────────────────────────
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai | ollama | deepseek

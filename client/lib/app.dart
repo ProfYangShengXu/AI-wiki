@@ -50,7 +50,24 @@ class _BootstrapGateState extends ConsumerState<BootstrapGate> {
   Widget build(BuildContext context) {
     final state = ref.watch(bootstrapControllerProvider);
     if (state.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      // 转圈 + 进度文案,避免"光转圈没反应"的观感
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              if (state.message.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  state.message,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
     }
     if (state.required) {
       return const BootstrapPage();

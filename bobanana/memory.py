@@ -9,11 +9,11 @@ import sqlite3
 import threading
 from datetime import UTC, datetime
 
-from bobanana.config import BASE_DIR
+from bobanana.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = BASE_DIR / "data" / "session_memory.db"
+DB_PATH = DATA_DIR / "data" / "session_memory.db"
 _LOCK = threading.Lock()
 
 

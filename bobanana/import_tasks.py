@@ -22,7 +22,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 
-from bobanana.config import BASE_DIR
+from bobanana.config import DATA_DIR
 from bobanana.errors import SW_TASK_404, SW_UPLOAD_400, SWError
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ TOKEN_BUCKET_WINDOW_SEC = 10.0
 DEDUP_SIMILARITY_THRESHOLD = 0.95
 
 # ── 持久化目录: tmp/import_tasks/ ───────────────────────────
-IMPORT_TASKS_DIR = BASE_DIR / "tmp" / "import_tasks"
+IMPORT_TASKS_DIR = DATA_DIR / "tmp" / "import_tasks"
 
 # ── 状态机 ──────────────────────────────────────────────────
 STATUS_QUEUED = "queued"

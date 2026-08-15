@@ -105,10 +105,24 @@ class SidecarService {
     try {
       final exeFile = File(exe);
       final workingDir = exeFile.parent.path;
+      // 数据目录与安装目录分离: 安装版在 Program Files 下不可写,
+      // 后端数据(chroma_db/uploads/logs 等)写入 %LOCALAPPDATA%。
+      final env = <String, String>{};
+      final localAppData = Platform.environment['LOCALAPPDATA'];
+      if (localAppData != null && localAppData.isNotEmpty) {
+        final dataDir = Directory(
+          '$localAppData${Platform.pathSeparator}StudyWiki-Agent${Platform.pathSeparator}data',
+        );
+        try {
+          dataDir.createSync(recursive: true);
+        } catch (_) {}
+        env['STUDYWIKI_DATA_DIR'] = dataDir.path;
+      }
       _process = await Process.start(
         exe,
         const [],
         workingDirectory: workingDir,
+        environment: env,
         mode: ProcessStartMode.normal,
       );
       _pid = _process!.pid;
