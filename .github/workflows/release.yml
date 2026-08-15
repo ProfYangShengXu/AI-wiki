@@ -65,11 +65,11 @@ jobs:
       - name: Zip Windows 客户端
         shell: pwsh
         run: |
-          Compress-Archive -Path client/build/windows/x64/runner/Release/* -DestinationPath client-windows.zip
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath client-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: client-windows
-          path: client-windows.zip
+          path: client/client-windows.zip
 
   build-client-apk:
     name: build-client-apk
@@ -87,11 +87,11 @@ jobs:
       - name: 重命名 APK
         shell: pwsh
         run: |
-          Copy-Item client/build/app/outputs/flutter-apk/app-debug.apk studywiki-client-debug.apk
+          Copy-Item build/app/outputs/flutter-apk/app-debug.apk studywiki-client-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: client-apk
-          path: studywiki-client-debug.apk
+          path: client/studywiki-client-debug.apk
 
   publish:
     name: publish gray release
