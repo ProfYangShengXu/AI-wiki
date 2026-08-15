@@ -52,6 +52,7 @@ jobs:
   build-client-windows:
     name: build-client-windows
     runs-on: windows-latest
+    needs: [build-backend]
     defaults:
       run:
         working-directory: client
@@ -62,7 +63,12 @@ jobs:
           channel: stable
       - run: flutter pub get
       - run: flutter build windows
-      - name: Zip Windows 客户端
+      - name: 内置后端 sidecar exe(客户端自动拉起)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-exe
+          path: client/build/windows/x64/runner/Release
+      - name: Zip Windows 客户端(自包含:客户端 + study-wiki-core.exe)
         shell: pwsh
         run: |
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath client-windows.zip
@@ -127,7 +133,7 @@ jobs:
             本版本为灰度测试版(pre-release),请按 `docs/gray-test-checklist.md` 执行测试并反馈。
 
             ### 安装
-            - Windows: 解压 `client-windows.zip` 运行客户端;或直接运行 `study-wiki-core.exe` 后浏览器打开 http://127.0.0.1:8000
+            - Windows: 解压 `client-windows.zip`,双击 `studywiki_client.exe` 即可——客户端会自动拉起内置的 `study-wiki-core.exe`(托盘常驻,关闭窗口最小化到托盘)
             - Android: 安装 `studywiki-client-debug.apk`(允许未知来源)
 
             ### 已知注意事项
