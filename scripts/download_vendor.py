@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """下载前端 CDN 依赖到 static/vendor/，实现离线运行。"""
 
-import urllib.request
 import os
 import sys
+import urllib.request
 
 VENDOR_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "vendor")
 

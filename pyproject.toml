@@ -2,4 +2,70 @@
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
-markers = ["asyncio: async tests"]
+markers = [
+    "asyncio: async tests",
+    "llm: 需要真实大模型（默认不在 CI 跑，通过 -m llm 手动触发）",
+]
+# 注：addopts 暂不设 -m "not llm" 过滤，避免误伤现有测试；
+# CI 在 pytest 命令行显式传 -m "not llm"，本地全量测试不受影响。
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+# 启用与现有代码风格冲突较小、收益明确的规则族：
+#   E/F/W —— pycodestyle / pyflakes（语法与基础质量）
+#   I     —— isort（import 排序）
+#   UP    —— pyupgrade（现代化写法）
+#   B     —— flake8-bugbear（常见 bug 模式）
+select = ["E", "F", "W", "I", "UP", "B"]
+
+# 依据 `ruff check bobanana tests scripts --select E,F,W,I,UP,B --statistics` 的
+# top 违规与既有代码风格确定，注释说明理由；第 4 轮清理时再逐步移除。
+ignore = [
+    # E701/E702: 单行多条语句（冒号/分号）。bobanana/agent*.py 等大量使用
+    # `if x: return y` 的紧凑写法（37+ 处），属既有风格，暂不强制拆分。
+    "E701",
+    "E702",
+    # E402: 模块级 import 不在文件顶部。bobanana/tools.py 在 docstring 之前
+    # 已有 import，且部分模块用延迟/局部导入规避重依赖，暂不强制。
+    "E402",
+    # B008: 函数默认参数里直接调用。FastAPI 路由中 File()/Depends() 是框架
+    # 惯用法（bobanana/routes/upload.py 等），无法避免。
+    "B008",
+]
+
+[tool.mypy]
+python_version = "3.11"
+# chromadb / langchain / sentence-transformers 等无完整类型标注，忽略其导入报错。
+ignore_missing_imports = true
+# 关键：numpy 2.x 自带 PEP 695（`type X = ...`）类型桩，mypy 目标 3.11 无法解析，
+# 会直接报 [syntax] 中断检查。关掉 site-packages 查找后，第三方包统一按 Any 处理，
+# 只对 bobanana 自身代码做类型检查——契合「宽松起步」定位。
+no_site_packages = true
+# 宽松起步：先抓「明显的类型错误」，暂不要求所有函数带类型注解。
+# 后续（第 4 轮）收紧：disallow_untyped_defs = true、
+# disallow_incomplete_defs = true，最终向 strict = true 演进。
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+warn_unused_ignores = false
+no_implicit_optional = false
+
+[tool.coverage.run]
+source = ["bobanana"]
+omit = ["bobanana/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# 覆盖率门禁:核心库 bobanana 行覆盖 ≥ 80%(当前 80%,CI 强制执行)。
+fail_under = 80
+# pragma 规则:标记 `# pragma: no cover` 的行/分支不计入覆盖率。
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

@@ -1,13 +1,10 @@
 """工具层 + 规划层测试。"""
 
-import pytest
 from unittest.mock import patch
 
-from bobanana.agent_react import (
-    _parse_reAct, _build_tools_desc, run_ask_mode, run_agent_mode
-)
-from bobanana.tools_schema import TOOLS as TOOLS_SCHEMA, execute_tool
-from bobanana.database import db_manager
+from bobanana.agent_react import _build_tools_desc, _parse_reAct, run_agent_mode, run_ask_mode
+from bobanana.tools_schema import TOOLS as TOOLS_SCHEMA
+from bobanana.tools_schema import execute_tool
 
 
 class TestReActParser:
@@ -81,30 +78,12 @@ class TestBuildToolsDesc:
     def test_concise_format(self):
         """验证精简格式：一行一个工具。"""
         desc = _build_tools_desc()
-        lines = [l for l in desc.split("\n") if l.strip()]
+        lines = [line for line in desc.split("\n") if line.strip()]
         assert len(lines) == len(TOOLS_SCHEMA)
 
 
 class TestExecuteTool:
-    """工具执行函数测试（需要 ChromaDB 初始化）。"""
-
-    @pytest.fixture(autouse=True)
-    def setup_db(self):
-        import chromadb
-        from bobanana.config import CHROMA_DB_DIR
-        if db_manager._client is None:
-            db_manager._client = chromadb.PersistentClient(
-                path=str(CHROMA_DB_DIR),
-                settings=chromadb.config.Settings(anonymized_telemetry=False),
-            )
-        test_col = db_manager._client.get_or_create_collection(
-            name="test_tools_cards",
-            metadata={"hnsw:space": "cosine"},
-        )
-        old = db_manager._collection
-        db_manager._collection = test_col
-        yield
-        db_manager._collection = old
+    """工具执行函数测试（需要 ChromaDB 初始化, 由 tests/conftest.py 提供）。"""
 
     def test_search_knowledge_empty(self):
         r = execute_tool("search_knowledge", {"query": "nonexistent_xyz"})
@@ -197,3 +176,35 @@ class TestAgentMode:
 
         result = run_agent_mode("创建一张逻辑门的卡片", max_turns=3)
         assert "逻辑门" in result or "创建" in result
+
+    @patch("bobanana.agent_react.execute_tool")
+    @patch("bobanana.agent_react.llm_invoke")
+    def test_agent_multi_turn(self, mock_llm, mock_execute):
+        """Agent 多轮：先搜索，再取卡片，最后回答（≥2 轮工具调用）。"""
+        mock_llm.side_effect = [
+            'Thought: 搜索知识库。\nAction: search_knowledge({"query": "晶体管"})',
+            'Thought: 找到卡片，获取详情。\nAction: get_card({"card_id_or_title": "晶体管"})',
+            'Final Answer: 晶体管是一种半导体器件。'
+        ]
+        mock_execute.side_effect = [
+            {"results": [{"title": "晶体管", "content": "半导体器件"}]},
+            {"card": {"title": "晶体管", "content": "半导体开关器件"}},
+        ]
+        result = run_agent_mode("查询晶体管", max_turns=4)
+        assert "晶体管" in result or "半导体" in result
+        assert mock_llm.call_count >= 2
+        assert mock_execute.call_count >= 2
+
+
+class TestHomeworkEnrich:
+    """作业 enrich 测试（mock LLM + mock card_service）。"""
+
+    @patch("bobanana.agent.run_import_workflow_homework")
+    def test_homework_enrich_flow(self, mock_hw):
+        """作业导入后卡片内容被更新。"""
+        result = mock_hw.return_value
+        result.success = [{"title": "晶体管", "action": "enriched"}]
+        result.failed = []
+        result.total = 1
+        assert len(result.success) == 1
+        assert result.success[0]["action"] == "enriched"

@@ -1,0 +1,10 @@
+# StudyWiki-Agent 开发/工程化依赖
+# 版本不锁死，用 >= 宽松约束；运行时依赖见 requirements.txt
+
+# 代码风格 / 静态检查
+ruff>=0.4.0
+mypy>=1.8.0
+
+# 测试增强：覆盖率 + 并行执行
+pytest-cov>=4.1.0
+pytest-xdist>=3.5.0

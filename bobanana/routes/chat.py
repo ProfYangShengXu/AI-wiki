@@ -1,14 +1,32 @@
-"""WebSocket 对话路由 — 连接 Agent 问答工作流，推送进度事件。"""
+"""WebSocket 对话路由 — 连接 Agent 问答工作流，推送进度事件。
+
+Phase 2 增强:
+- 每连接生成 session_id, 会话记忆持久化到 SQLite;
+- 流式(llm.delta)/工具(tool.called/tool.result)/审批(approval_required)事件经
+  stream_cb 用 call_soon_threadsafe 投递;
+- 连接生命周期事件 session.started/done/error。
+"""
 
 import asyncio
+import json
 import logging
+import uuid
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from bobanana import memory
+from bobanana.errors import SWError
 from bobanana.models import WSMessage
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# 语义事件类型白名单(契约 §1.4),未知类型回退为 progress 以兼容旧客户端。
+_SEMANTIC_EVENT_TYPES = {
+    "llm.delta", "tool.called", "tool.result", "approval_required",
+    "approval", "session.started", "session.done", "session.error", "progress",
+}
 
 class ConnectionManager:
     """管理 WebSocket 连接和消息发送。"""
@@ -66,13 +84,59 @@ def make_progress_callback(conn_id: int, main_loop=None):
 
     return callback
 
+def make_event_callback(conn_id: int, main_loop=None):
+    """创建事件回调(llm.delta/tool.called/tool.result/approval_required 等)。
+
+    事件 dict 的 "type" 键映射为 WSMessage.type,payload 随 data 字段承载。
+    """
+    if main_loop is None:
+        try:
+            main_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            main_loop = None
+
+    def callback(event: dict):
+        try:
+            msg_type = event.get("type") or "progress"
+            if msg_type not in _SEMANTIC_EVENT_TYPES:
+                msg_type = "progress"
+            msg = WSMessage(
+                type=msg_type,
+                content=str(event.get("delta", event.get("summary", ""))),
+                data=event,
+            )
+            if main_loop and main_loop.is_running():
+                main_loop.call_soon_threadsafe(
+                    lambda: asyncio.ensure_future(manager.send(conn_id, msg))
+                )
+        except Exception as e:
+            logger.warning("事件回调失败: %s", e)
+
+    return callback
+
+async def _send_event(conn_id: int, evt: dict):
+    """发送语义事件(session.started/done/error 等)。"""
+    msg_type = evt.get("type") or "progress"
+    await manager.send(
+        conn_id,
+        WSMessage(
+            type=msg_type if msg_type in _SEMANTIC_EVENT_TYPES else "progress",
+            content=evt.get("content", ""),
+            data=evt,
+        ),
+    )
+
 @router.websocket("/ws/chat")
 async def chat_websocket(websocket: WebSocket):
     conn_id = await manager.connect(websocket)
     logger.info("WebSocket 连接已建立: #%d", conn_id)
 
-    # 对话历史
-    chat_history: list[dict] = []
+    # 会话记忆
+    session_id = uuid.uuid4().hex
+    memory.init_db()
+    chat_history: list[dict] = memory.get_history(session_id, limit=20)
+
+    await _send_event(conn_id, {"type": "session.started", "session_id": session_id})
 
     # 发送欢迎消息
     await manager.send(
@@ -89,6 +153,29 @@ async def chat_websocket(websocket: WebSocket):
     try:
         while True:
             raw = await websocket.receive_text()
+
+            # 审批消息 (客户端 → 服务端)
+            # 兼容两种负载形态: {"type":"approval","approval_id":...,"approved":...}
+            # 与 {"type":"approval","data":{"approval_id":...,"approved":...}}
+            try:
+                raw_obj = json.loads(raw)
+                if isinstance(raw_obj, dict) and raw_obj.get("type") == "approval":
+                    from bobanana.agent_react import resolve_approval
+                    data = raw_obj.get("data")
+                    payload = data if isinstance(data, dict) else raw_obj
+                    approval_id = payload.get("approval_id")
+                    approved = bool(payload.get("approved"))
+                    resolved = resolve_approval(str(approval_id), approved)
+                    await _send_event(conn_id, {
+                        "type": "approval",
+                        "approval_id": approval_id,
+                        "approved": approved,
+                        "resolved": resolved,
+                    })
+                    continue
+            except Exception:
+                pass
+
             try:
                 msg = WSMessage.model_validate_json(raw)
             except Exception:
@@ -107,14 +194,80 @@ async def chat_websocket(websocket: WebSocket):
 
             # 记录对话历史
             chat_history.append({"role": "user", "content": user_content})
+            memory.append_message(session_id, "user", user_content)
 
             # 判断模式
             mode = msg.data.get("mode", "ask") if msg.data else "ask"
 
             if mode == "agent":
-                await _handle_agent(conn_id, user_content, chat_history)
-            else:
-                await _handle_question(conn_id, user_content, chat_history)
+                # Agent 模式挂后台任务执行,保持接收循环活跃,
+                # 以便处理客户端回发的审批消息 (approval)。
+                task = asyncio.create_task(_handle_agent(conn_id, user_content, chat_history))
+
+                def _finish(t: asyncio.Task):
+                    failed = False
+                    try:
+                        answer = t.result()
+                    except SWError as e:
+                        failed = True
+                        answer = e.message
+                        logger.error("Agent 失败 (%s): %s", e.error_code, e.message)
+                    except Exception as e:  # noqa: BLE001
+                        failed = True
+                        answer = f"处理失败: {e}"
+                        logger.error("Agent 失败: %s", e)
+                    chat_history.append({"role": "assistant", "content": answer})
+                    memory.append_message(session_id, "assistant", answer)
+                    asyncio.ensure_future(manager.send(
+                        conn_id, WSMessage(type="response", content=answer),
+                    ))
+                    if failed:
+                        asyncio.ensure_future(_send_event(conn_id, {
+                            "type": "session.error", "session_id": session_id,
+                            "message": answer,
+                        }))
+                    else:
+                        asyncio.ensure_future(_send_event(conn_id, {
+                            "type": "session.done", "session_id": session_id,
+                        }))
+
+                task.add_done_callback(_finish)
+                continue
+
+            failed = False
+            try:
+                answer = await _handle_question(conn_id, user_content, chat_history)
+            except SWError as e:
+                failed = True
+                logger.error("处理失败 (%s): %s", e.error_code, e.message)
+                answer = e.message
+                await _send_event(conn_id, {
+                    "type": "session.error",
+                    "session_id": session_id,
+                    "error_code": e.error_code,
+                    "message": e.message,
+                })
+            except Exception as e:
+                failed = True
+                logger.error("处理失败: %s", e)
+                answer = f"处理失败: {e}"
+                await _send_event(conn_id, {
+                    "type": "session.error",
+                    "session_id": session_id,
+                    "message": str(e),
+                })
+
+            # 记录回答到历史并持久化
+            chat_history.append({"role": "assistant", "content": answer})
+            memory.append_message(session_id, "assistant", answer)
+
+            # 发送回答
+            await manager.send(
+                conn_id,
+                WSMessage(type="response", content=answer),
+            )
+            if not failed:
+                await _send_event(conn_id, {"type": "session.done", "session_id": session_id})
 
     except WebSocketDisconnect:
         logger.info("WebSocket 连接断开: #%d", conn_id)
@@ -130,8 +283,8 @@ async def chat_websocket(websocket: WebSocket):
     finally:
         manager.disconnect(conn_id)
 
-async def _handle_question(conn_id: int, question: str, chat_history: list[dict]):
-    """处理问答请求。"""
+async def _handle_question(conn_id: int, question: str, chat_history: list[dict]) -> str:
+    """处理问答请求, 返回回答文本。"""
     # 发送"思考中"状态
     await manager.send(
         conn_id,
@@ -141,34 +294,20 @@ async def _handle_question(conn_id: int, question: str, chat_history: list[dict]
     # Ask 模式 — 仅查知识库回答
     from bobanana.agent_react import run_ask_mode
     loop = asyncio.get_event_loop()
-    answer = await loop.run_in_executor(None, run_ask_mode, question, chat_history)
+    stream_cb = make_event_callback(conn_id, main_loop=loop)
+    answer = await loop.run_in_executor(None, run_ask_mode, question, chat_history, stream_cb)
+    return answer
 
-    # 记录回答到历史
-    chat_history.append({"role": "assistant", "content": answer})
-
-    # 发送回答
-    await manager.send(
-        conn_id,
-        WSMessage(type="response", content=answer),
-    )
-
-async def _handle_agent(conn_id: int, instruction: str, chat_history: list[dict]):
-    """Agent 模式 — CoT + ReAct 循环。"""
+async def _handle_agent(conn_id: int, instruction: str, chat_history: list[dict]) -> str:
+    """Agent 模式 — CoT + ReAct 循环, 返回回答文本。"""
     from bobanana.agent_react import run_agent_mode
     await manager.send(conn_id, WSMessage(type="progress", data={"stage": "agent", "status": "thinking"}))
 
-    try:
-        loop = asyncio.get_event_loop()
-        main_loop = loop
-        progress_cb = make_progress_callback(conn_id, main_loop=main_loop)
-        answer = await loop.run_in_executor(
-            None, run_agent_mode, instruction, chat_history, progress_cb, 6
-        )
-    except Exception as e:
-        import traceback
-        answer = f"Agent 执行失败: {e}\n\n提示: 请用更简洁的语言描述任务。"
-        logger.error("Agent error for '%s': %s\n%s", instruction[:80], e, traceback.format_exc())
-
-    chat_history.append({"role": "assistant", "content": answer})
-    await manager.send(conn_id, WSMessage(type="response", content=answer))
-
+    loop = asyncio.get_event_loop()
+    main_loop = loop
+    progress_cb = make_progress_callback(conn_id, main_loop=main_loop)
+    stream_cb = make_event_callback(conn_id, main_loop=main_loop)
+    answer = await loop.run_in_executor(
+        None, run_agent_mode, instruction, chat_history, progress_cb, None, stream_cb
+    )
+    return answer

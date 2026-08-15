@@ -1,44 +1,9 @@
-"""数据库 + 服务层集成测试（使用真实 ChromaDB 实例）。"""
+"""数据库 + 服务层集成测试（使用 tmp_path 下的隔离 ChromaDB 实例, 由 tests/conftest.py 提供）。"""
 
-import chromadb
 import pytest
 
-from bobanana.config import CHROMA_DB_DIR
-from bobanana.database import db_manager
-from bobanana.service.card_service import card_service
 from bobanana.models import CardCreate, CardUpdate
-
-# 测试集合名
-TEST_COLLECTION = "test_p4_cards"
-
-
-@pytest.fixture(autouse=True)
-def setup_test_env():
-    """初始化 ChromaDB + 创建测试集合。"""
-    # 若未初始化，直接创建客户端
-    if db_manager._client is None:
-        db_manager._client = chromadb.PersistentClient(
-            path=str(CHROMA_DB_DIR),
-            settings=chromadb.config.Settings(anonymized_telemetry=False),
-        )
-    # 清理旧测试集合
-    try:
-        db_manager._client.delete_collection(TEST_COLLECTION)
-    except Exception:
-        pass
-    # 创建测试集合
-    test_col = db_manager._client.create_collection(
-        name=TEST_COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
-    old_col = db_manager._collection
-    db_manager._collection = test_col
-    yield
-    db_manager._collection = old_col
-    try:
-        db_manager._client.delete_collection(TEST_COLLECTION)
-    except Exception:
-        pass
+from bobanana.service.card_service import card_service
 
 
 @pytest.mark.asyncio

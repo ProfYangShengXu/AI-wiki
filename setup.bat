@@ -1,10 +1,10 @@
 @echo off
-title StudyWiki-Agent v0.3.6 Installer
+title StudyWiki-Agent v0.3.0 Installer
 cd /d "%~dp0"
 
 echo.
 echo    =========================================
-echo      StudyWiki-Agent v0.3.6
+echo      StudyWiki-Agent v0.3.0
 echo      Local Knowledge Base AI Installer
 echo    =========================================
 echo.
@@ -28,14 +28,19 @@ echo    [OK] Virtual environment
 
 :: -- 3. Install deps --
 echo    Installing dependencies...
-call .venv\Scripts\activate.bat >nul 2>&1
-pip install -r requirements.txt --quiet 2>nul
+set "PY=%~dp0.venv\Scripts\python.exe"
+"%PY%" -m pip install -r requirements.txt --disable-pip-version-check --no-input
+if errorlevel 1 (
+    echo    [ERROR] Dependency installation failed. Check messages above.
+    pause
+    exit /b 1
+)
 echo    [OK] Dependencies
 
 :: -- 4. Vendor assets --
 echo    Downloading frontend assets...
 if not exist "static\vendor\" mkdir static\vendor >nul
-python scripts/download_vendor.py >nul 2>&1
+"%PY%" scripts/download_vendor.py
 echo    [OK] Frontend assets
 
 :: -- 5. Create .env if missing --

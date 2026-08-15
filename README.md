@@ -47,6 +47,29 @@ Browser (DaisyUI) ← WebSocket → FastAPI Backend
 - Obsidian: 不自动提取，需要手动写
 - ChatGPT: 聊完就忘，没有知识库
 
+
+---
+
+**Phase 2 已落地能力(2026-08)**
+
+- Agent v2:结构化工具调用(Pydantic 校验/预算熔断/审批闸门/流式事件/会话记忆/供应商降级链)
+- 导入任务状态机:`queued → scanning → extracting → linking → done/failed/cancelled`,支持取消、断点续跑、去重报告、限速
+- 混合检索:BM25 + 向量余弦 RRF 融合,元数据过滤;检索基准 50/50、Agent 基准 20/20
+- ChromaDB 生命周期:磁盘水位保护、定时 persist、失败写入重试;一键备份/恢复(`/api/backup/*`)
+- 可观测性:`X-Trace-Id` 全链路、`/api/metrics` 指标、日志 Key 脱敏
+- 统一契约:SW 错误码、`api/openapi.yaml` v1(39 路径)、`/api/pair/*` 设备配对
+- Web 前端:流式聊天、深色主题、上传进度、审批弹窗、知识图谱
+- 工程质量:ruff/mypy 零错误、覆盖率 80%(CI 门禁)、无 API Key 全绿、完整 CI(双系统矩阵 + Flutter 构建)
+
+**下一阶段规划**
+
+- 主方案：[docs/next-phase-optimization.md](docs/next-phase-optimization.md) — Android/Windows 客户端、UI/UX、Agent 优化、集成与 E2E 测试路线图
+- 准备清单：[docs/phase2-preparation-checklist.md](docs/phase2-preparation-checklist.md)
+- 技术选型 ADR：[docs/adr/0001-client-platform.md](docs/adr/0001-client-platform.md)
+- Flutter 客户端：[client/README.md](client/README.md) — Android/Windows 共享前端源码
+- Linux/WSL 测试：[docs/testing-linux-wsl.md](docs/testing-linux-wsl.md) — 虚拟机测试环境与一键脚本
+
+
 ---
 
 **License**

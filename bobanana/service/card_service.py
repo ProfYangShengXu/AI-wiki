@@ -5,12 +5,11 @@ import json
 import logging
 import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from bobanana.config import RETRIEVAL_TOP_K
 from bobanana.database import db_manager
-from bobanana.models import KnowledgeCard, CardCreate, CardUpdate, ImportResult
+from bobanana.models import CardCreate, CardUpdate, ImportResult, KnowledgeCard
 from bobanana.tools import embed_text
 
 logger = logging.getLogger(__name__)
@@ -37,19 +36,20 @@ class CardService:
 
     # ── 读操作（无锁） ─────────────────────────────────────
 
-    async def get_card(self, card_id: str) -> Optional[KnowledgeCard]:
+    async def get_card(self, card_id: str) -> KnowledgeCard | None:
         return db_manager.get_card(card_id)
 
     async def list_cards(
-        self, category: Optional[str] = None, page: int = 1, limit: int = 50
+        self, category: str | None = None, page: int = 1, limit: int = 50
     ) -> tuple[list[KnowledgeCard], int]:
         return db_manager.list_cards(category, page, limit)
 
     async def search_cards(
         self, query: str, top_k: int = RETRIEVAL_TOP_K
     ) -> list[tuple[KnowledgeCard, float]]:
+        """混合检索(异步,签名保持兼容):BM25 + 向量余弦 + RRF 融合。"""
         embedding = self._compute_embedding(query)
-        return db_manager.search_cards(embedding, top_k)
+        return db_manager.hybrid_search(query, embedding, top_k)
 
     async def get_categories(self) -> list[str]:
         return db_manager.get_categories()
@@ -61,7 +61,7 @@ class CardService:
 
     async def create_card(self, data: CardCreate) -> KnowledgeCard:
         """创建卡片 — embedding 在锁外计算。"""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         card = KnowledgeCard(
             id=str(uuid.uuid4()),
             title=data.title,
@@ -86,7 +86,7 @@ class CardService:
         await self._detect_and_link(card.id, card)
         return card
 
-    async def update_card(self, card_id: str, data: CardUpdate) -> Optional[KnowledgeCard]:
+    async def update_card(self, card_id: str, data: CardUpdate) -> KnowledgeCard | None:
         """更新卡片 — embedding 在锁外计算。"""
         existing = db_manager.get_card(card_id)
         if not existing:
@@ -95,7 +95,7 @@ class CardService:
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(existing, field, value)
-        existing.updated_at = datetime.now(timezone.utc).isoformat()
+        existing.updated_at = datetime.now(UTC).isoformat()
 
         # 锁外计算 embedding
         embedding = self._compute_embedding(existing.embedding_text())
@@ -121,7 +121,7 @@ class CardService:
         # 锁外预计算所有 embedding
         prepared = []
         for data in cards:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             card = KnowledgeCard(
                 id=str(uuid.uuid4()),
                 title=data.title,
@@ -154,9 +154,9 @@ class CardService:
             try:
                 cid = card_resp.id if hasattr(card_resp, 'id') else ''
                 if cid:
-                    card = db_manager.get_card(cid)
-                    if card:
-                        await self._detect_and_link(cid, card)
+                    linked_card = db_manager.get_card(cid)
+                    if linked_card:
+                        await self._detect_and_link(cid, linked_card)
             except Exception:
                 pass
         logger.info("批量导入: %d 成功, %d 失败", len(result.success), len(result.failed))
@@ -230,18 +230,32 @@ class CardService:
     def get_categories_sync(self):
         return db_manager.get_categories()
 
-    def search_cards_sync(self, query: str, top_k: int = RETRIEVAL_TOP_K) -> list:
-        """同步版搜索。"""
-        embedding = self._compute_embedding(query)
-        return db_manager.search_cards(embedding, top_k)
+    def search_cards_sync(self, query: str, top_k: int = RETRIEVAL_TOP_K, **filters) -> list:
+        """同步版搜索 — 混合检索(BM25 + 向量余弦 + RRF 融合)。
+
+        filters 支持 category / source_file / min_mastery(候选取出后过滤)。
+        """
+        import time as _time
+        t0 = _time.monotonic()
+        try:
+            embedding = self._compute_embedding(query)
+            return db_manager.hybrid_search(query, embedding, top_k, **filters)
+        finally:
+            try:
+                from bobanana.observability import metrics
+                metrics.observe("search_seconds", _time.monotonic() - t0)
+            except Exception:  # noqa: BLE001 — 指标失败不影响检索
+                pass
 
     def deduplicate_sync(self, threshold: float = 0.93) -> dict:
         """去重：查找语义相似的卡片，合并后删除重复。返回 {merged: N, deleted: N}。"""
         import numpy as np
+
         from bobanana.models import CardUpdate
 
         # 获取所有卡片+嵌入向量
-        result = db_manager._collection.get(include=["embeddings", "metadatas", "documents"])
+        coll = db_manager.get_collection()
+        result = coll.get(include=["embeddings", "metadatas", "documents"])
         if not result or not result.get("ids"):
             return {"merged": 0, "deleted": 0}
 

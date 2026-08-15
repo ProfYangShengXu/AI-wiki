@@ -1,0 +1,20 @@
+{"id": "A-01", "intent": "create", "text": "创建一张名为'异或门'的知识卡片,内容包含真值表说明和奇偶校验这个应用场景,分类为'数字逻辑'。", "expected_tools": ["create_card"], "expected_title": "异或门", "expected_category": "数字逻辑"}
+{"id": "A-02", "intent": "create", "text": "批量创建两张卡片:半加器和全加器,都属于'数字逻辑'分类。", "expected_tools": ["create_card"], "expected_titles": ["半加器", "全加器"]}
+{"id": "A-03", "intent": "create", "text": "创建'PN结单向导电性'卡片,分类'模拟电子',并给出一个正向导通的例子。", "expected_tools": ["create_card"], "expected_title": "PN结", "expected_category": "模拟电子"}
+{"id": "A-04", "intent": "create", "text": "创建'戴维南定理'卡片,内容要包含开路电压和等效电阻的求法。", "expected_tools": ["create_card"], "expected_title": "戴维南定理"}
+{"id": "Q-01", "intent": "query", "text": "什么是基尔霍夫电压定律?", "expected_tools": ["search_knowledge"], "expected_keywords": ["KVL", "基尔霍夫"]}
+{"id": "Q-02", "intent": "query", "text": "帮我找一下知识库里关于译码器的卡片。", "expected_tools": ["search_knowledge"], "expected_keywords": ["译码器"]}
+{"id": "Q-03", "intent": "query", "text": "栈和队列有什么区别?", "expected_tools": ["search_knowledge"], "expected_keywords": ["栈", "队列", "LIFO", "FIFO"]}
+{"id": "Q-04", "intent": "query", "text": "知识库里有哪些关于二极管的卡片?", "expected_tools": ["search_knowledge"], "expected_keywords": ["二极管"]}
+{"id": "M-01", "intent": "modify", "text": "把'与门'卡片的内容补充一段与非门的对比说明。", "expected_tools": ["update_card"], "expected_title": "与门", "expected_keywords": ["与非门"]}
+{"id": "M-02", "intent": "modify", "text": "将'进程'卡片的分类改为'操作系统'。", "expected_tools": ["update_card"], "expected_title": "进程", "expected_category": "操作系统"}
+{"id": "M-03", "intent": "modify", "text": "给'全加器'卡片增加别名 full adder。", "expected_tools": ["update_card"], "expected_title": "全加器", "expected_alias": "full adder"}
+{"id": "D-01", "intent": "delete", "text": "删除'异或门'这张卡片。", "expected_tools": ["delete_card"], "expected_title": "异或门", "requires_approval": true}
+{"id": "D-02", "intent": "delete", "text": "清空所有分类为'数字逻辑'的卡片。", "expected_tools": ["delete_card"], "expected_category": "数字逻辑", "requires_approval": true}
+{"id": "Z-01", "intent": "quiz", "text": "为'基尔霍夫定律'出 3 道简答题。", "expected_tools": ["start_quiz"], "expected_title": "基尔霍夫"}
+{"id": "Z-02", "intent": "quiz", "text": "给这份答案评分:题目'什么是KCL',我的回答'流入节点的电流之和等于流出节点的电流之和'。", "expected_tools": ["grade_quiz"], "expected_keywords": ["KCL"]}
+{"id": "Z-03", "intent": "quiz", "text": "为'三极管放大电路'生成一份测验。", "expected_tools": ["start_quiz"], "expected_title": "三极管"}
+{"id": "E-01", "intent": "exam", "text": "从'电路分析'和'模拟电子'分类的卡片中组一份综合试卷。", "expected_tools": ["create_exam"], "expected_categories": ["电路分析", "模拟电子"]}
+{"id": "E-02", "intent": "exam", "text": "用数字逻辑相关的卡片出一份 5 道题的综合卷。", "expected_tools": ["create_exam"], "expected_keywords": ["数字逻辑"]}
+{"id": "I-01", "intent": "import", "text": "把 docs/eval/fixtures/md_kirchhoff.md 导入知识库。", "expected_tools": ["upload_document"], "expected_file": "md_kirchhoff.md"}
+{"id": "I-02", "intent": "import", "text": "导入 docs/eval/fixtures/pdf_diode.pdf 并提取知识点。", "expected_tools": ["upload_document"], "expected_file": "pdf_diode.pdf"}

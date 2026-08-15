@@ -1,20 +1,22 @@
 """设置 API — 前端可配置 LLM 参数。"""
 
 import logging
-from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from bobanana.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-ENV_PATH = Path(__file__).parent.parent / ".env"
+ENV_PATH = BASE_DIR / ".env"
 
 RELOAD_KEYS = {
     "OPENAI_API_KEY": "OpenAI API Key",
     "OPENAI_MODEL": "OpenAI 模型名",
+    "OPENAI_BASE_URL": "OpenAI API 地址",
     "DEEPSEEK_API_KEY": "DeepSeek API Key",
     "DEEPSEEK_MODEL": "DeepSeek 模型名",
     "DEEPSEEK_BASE_URL": "DeepSeek API 地址",
@@ -26,6 +28,27 @@ RELOAD_KEYS = {
     "LLM_TIMEOUT_SEC": "超时秒数",
     "EMBEDDING_PROVIDER": "嵌入模型 (openai/sentence-transformers)",
 }
+def _mask_value(key: str, value: str) -> str:
+    """API Key 只显示尾号，其他值原样返回。"""
+    if "API_KEY" in key and value:
+        value = value.strip().strip('"').strip("'")
+        if len(value) <= 8:
+            return "***"
+        return f"{value[:3]}...{value[-4:]}"
+    return value
+
+
+def _validate_update(key: str, value: str) -> None:
+    if key not in RELOAD_KEYS:
+        raise HTTPException(status_code=400, detail=f"不允许修改配置项: {key}")
+    if "API_KEY" in key and value and ("..." in value or "***" in value):
+        raise HTTPException(status_code=400, detail="API Key 不能使用掩码值，请输入完整 Key")
+    if key == "LLM_PROVIDER" and value not in {"openai", "deepseek", "ollama"}:
+        raise HTTPException(status_code=400, detail="LLM_PROVIDER 仅支持 openai/deepseek/ollama")
+
+
+def _log_value(key: str, value: str) -> str:
+    return _mask_value(key, value) if "API_KEY" in key else value
 
 
 class SettingsUpdate(BaseModel):
@@ -43,12 +66,14 @@ async def get_settings():
             if "=" in line and not line.startswith("#"):
                 k, v = line.split("=", 1)
                 env[k.strip()] = v.strip()
-    return {"status": "success", "data": {"settings": env, "descriptions": RELOAD_KEYS}}
+    masked_env = {k: _mask_value(k, v) for k, v in env.items() if k in RELOAD_KEYS}
+    return {"status": "success", "data": {"settings": masked_env, "descriptions": RELOAD_KEYS}}
 
 
 @router.post("/")
 async def save_setting(update: SettingsUpdate):
     """更新单条 .env 配置。"""
+    _validate_update(update.key, update.value)
     env = {}
     if ENV_PATH.exists():
         for line in open(ENV_PATH, encoding="utf-8"):
@@ -63,13 +88,15 @@ async def save_setting(update: SettingsUpdate):
         for k, v in env.items():
             f.write(f"{k}={v}\n")
 
-    logger.info("设置已更新: %s=%s", update.key, update.value[:10] + "..." if len(update.value) > 10 else update.value)
+    logger.info("设置已更新: %s=%s", update.key, _log_value(update.key, update.value))
     return {"status": "success", "message": f"{RELOAD_KEYS.get(update.key, update.key)} 已更新"}
 
 
 @router.post("/batch")
 async def save_settings(updates: list[SettingsUpdate]):
     """批量更新 .env 配置。"""
+    for update in updates:
+        _validate_update(update.key, update.value)
     env = {}
     if ENV_PATH.exists():
         for line in open(ENV_PATH, encoding="utf-8"):

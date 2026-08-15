@@ -3,88 +3,140 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>StudyWiki-Agent</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 <style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;height:100vh;font:13px/1.5 system-ui,sans-serif;color:#333}
-#app{display:flex;flex-direction:column;height:100vh}
-#sidebar{width:260px;overflow-y:auto;flex-shrink:0;background:#fff;border-right:1px solid #e0e0e0}
-.card-link{color:#2563eb;text-decoration:underline dotted;cursor:pointer}
-.card-link:hover{background:#eff6ff}
-.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center}
-.btn{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid #d0d0d0;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;line-height:1.4;gap:2px}
-.btn:hover{background:#f0f0f0}
-.btn-primary{background:#2563eb;color:#fff;border-color:#2563eb}
-.btn-primary:hover{background:#1d4ed8}
-.btn-error{color:#dc2626}
-.btn-success{background:#16a34a;color:#fff;border-color:#16a34a}
-.btn-success:hover{background:#15803d}
-.btn-sm{padding:4px 12px;font-size:12px}
-.btn-xs{padding:1px 6px;font-size:11px}
-.btn-ghost{border-color:transparent;background:transparent}
-.btn-ghost:hover{background:#f0f0f0}
-.btn-square{aspect-ratio:1}
-.badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;border:1px solid #d0d0d0;line-height:1.4}
-.badge-outline{background:transparent}
-.badge-sm{font-size:10px;padding:0 4px}
-.input{display:block;width:100%;padding:4px 6px;border:1px solid #d0d0d0;border-radius:4px;font-size:12px;line-height:1.4;outline:none}
-.input:focus{border-color:#2563eb;box-shadow:0 0 0 1px #2563eb}
-.input-sm{padding:2px 6px}
-.input-bordered{border-color:#d0d0d0}
-.textarea{display:block;width:100%;padding:4px 6px;border:1px solid #d0d0d0;border-radius:4px;font-size:12px;line-height:1.4;resize:vertical;outline:none}
-.textarea:focus{border-color:#2563eb;box-shadow:0 0 0 1px #2563eb}
-.textarea-bordered{border-color:#d0d0d0}
-.checkbox{width:14px;height:14px;cursor:pointer}
-.spinner{display:inline-block;width:12px;height:12px;border:2px solid #ccc;border-top-color:#2563eb;border-radius:50%;animation:spin .6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.cursor-pointer{cursor:pointer}
-.hover-bg:hover{background:#f0f0f0}
-.hover-blue:hover{background:#eff6ff}
-.border-b{border-bottom:1px solid #e0e0e0}
-.border-t{border-top:1px solid #e0e0e0}
-.border-r{border-right:1px solid #e0e0e0}
-.rounded{border-radius:4px}
-.text-xs{font-size:11px}
+
+/* --- Auto-extracted utility classes (bc-001 fix) --- */
+.flex{display:flex}
+.flex-1{flex:1}
+.flex-col{flex-direction:column}
+.items-center{align-items:center}
+.justify-center{justify-content:center}
+.justify-between{justify-content:space-between}
+.gap-4{gap:4px}
+.gap-8{gap:8px}
+.ml-auto{margin-left:auto}
+.mt-8{margin-top:8px}
+.mt-12{margin-top:12px}
+.mb-8{margin-bottom:8px}
+.mb-4{margin-bottom:4px}
+.p-4{padding:4px}
+.p-8{padding:8px}
+.p-16{padding:16px}
+.w-full{width:100%}
+.w-120{width:120px}
+.h-100{height:100%}
+.text-center{text-align:center}
+.text-red{color:var(--danger)}
+.text-gray-400{color:var(--muted)}
 .text-sm{font-size:12px}
-.text-base{font-size:14px}
-.text-lg{font-size:16px}
-.text-xl{font-size:18px}
+.text-xs{font-size:11px}
 .font-bold{font-weight:700}
 .font-semibold{font-weight:600}
-.text-gray{color:#999}
-.text-blue-600{color:#2563eb}
-.text-red-500{color:#dc2626}
-.text-green-700{color:#15803d}
-.bg-green-50{background:#f0fdf4}
-.bg-yellow-50{background:#fefce8}
-.bg-red-50{background:#fef2f2}
-.border-green-200{border-color:#bbf7d0}
-.border-yellow-200{border-color:#fef08a}
-.border-red-200{border-color:#fecaca}
-.divider{margin:8px 0;border-bottom:1px solid #e0e0e0}
-.prose{max-width:none;white-space:pre-wrap}
+.block{display:block}
+.hidden{display:none}
+.relative{position:relative}
+.overflow-auto{overflow:auto}
+.border-bottom{border-bottom:1px solid var(--border)}
+.border-top{border-top:1px solid var(--border)}
+.border-r{border-right:1px solid var(--border)}
+.bg-white{background:var(--card);color:var(--fg)}
+.bg-gray{background:var(--bg-alt)}
+.rounded-8{border-radius:8px}
+.shadow{box-shadow:0 4px 24px var(--shadow)}
+.spinner-margin{margin:8px auto}
+
+/* --- Theme tokens (light default) --- */
+:root{
+  --bg:#ffffff;--bg-alt:#f5f5f7;--fg:#1f2328;--fg-soft:#333333;
+  --card:#ffffff;--card-2:#fafafa;--muted:#8b949e;
+  --border:#e0e0e0;--border-strong:#d0d0d0;
+  --accent:#2563eb;--accent-fg:#ffffff;
+  --danger:#dc2626;--ok:#16a34a;--warn:#d97706;
+  --bubble-user:#2563eb;--bubble-ai:#e8e8ea;--bubble-ai-fg:#333333;
+  --link:#2563eb;--hover:#f0f0f0;--hover-accent:#eff6ff;
+  --shadow:rgba(0,0,0,.2);
+}
+body.dark{
+  --bg:#0f1117;--bg-alt:#161a23;--fg:#e6e8ee;--fg-soft:#c9ccd4;
+  --card:#1a1e29;--card-2:#202634;--muted:#8b949e;
+  --border:#2a2f3d;--border-strong:#3a4152;
+  --accent:#6ea8fe;--accent-fg:#0f1117;
+  --danger:#f87171;--ok:#34d399;--warn:#fbbf24;
+  --bubble-user:#2563eb;--bubble-ai:#2a2f3d;--bubble-ai-fg:#e6e8ee;
+  --link:#6ea8fe;--hover:#242a38;--hover-accent:#1c2a44;
+  --shadow:rgba(0,0,0,.6);
+}
+
+body{margin:0;overflow:hidden;height:100vh;background:var(--bg);color:var(--fg)}
+#app{display:flex;flex-direction:column;height:100vh}
+#sidebar{width:260px;overflow-y:auto;flex-shrink:0;border-right:1px solid var(--border)}
+.card-link{color:var(--link);text-decoration:underline dotted;cursor:pointer}
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn-xs{padding:2px 6px!important;font-size:11px!important}
+.btn-sm{padding:4px 12px!important;font-size:12px!important}
+.btn-error{color:var(--danger)!important}
+.input-sm{padding:2px 6px!important;font-size:11px!important}
+.prose{white-space:pre-wrap}
+header nav{min-height:36px}
+aside{overflow-y:auto;font-size:13px}
+main{overflow-y:auto;padding:var(--pico-spacing)}
+#bootstrapMask{display:none;position:fixed;inset:0;z-index:1000;background:rgba(17,24,39,.55);backdrop-filter:blur(8px) grayscale(.9);-webkit-backdrop-filter:blur(8px) grayscale(.9);align-items:center;justify-content:center;padding:16px}
+.bootstrap-card{width:440px;max-width:96vw;background:#fff;border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.35);padding:22px 22px 18px}
+.bootstrap-card label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px;color:#334155}
+.bootstrap-card input,.bootstrap-card select{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}
+#bsStatus{min-height:18px;margin-top:10px;font-size:12px;line-height:1.5;color:#334155}
+#bsStatus.error{color:#dc2626}
+#bsStatus.ok{color:#16a34a}
+
+/* --- 工具步骤卡 --- */
+.sw-step{font-size:11px;margin:4px 0}
+.sw-step details{background:var(--card-2);border:1px solid var(--border);border-radius:6px;padding:4px 8px}
+.sw-step summary{cursor:pointer;display:flex;gap:6px;align-items:center;color:var(--muted);list-style:none}
+.sw-step summary::-webkit-details-marker{display:none}
+.sw-step-body{margin-top:6px;padding:6px;background:var(--card);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap;overflow:auto;color:var(--fg-soft);font-family:monospace;font-size:10px;max-height:160px}
+
+/* --- 审批弹窗 --- */
+.sw-approval-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px}
+.sw-approval-card{background:var(--card);color:var(--fg);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 12px 40px var(--shadow);padding:18px;width:440px;max-width:94vw}
+.sw-approval-card.sw-danger{border-color:var(--danger);box-shadow:0 12px 40px rgba(220,38,38,.25)}
+.sw-approval-args{max-height:180px;overflow:auto;white-space:pre-wrap;font-family:monospace;font-size:11px;background:var(--card-2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;color:var(--fg-soft)}
+
+/* --- Toast 提示条 --- */
+#swToastBox{position:fixed;top:12px;right:12px;z-index:3000;display:flex;flex-direction:column;gap:8px;max-width:360px}
+
+/* --- 上传进度面板 --- */
+.sw-upload{max-width:560px;margin:16px auto}
+
+/* --- 知识图谱 --- */
+.sw-gnode text{pointer-events:none;user-select:none}
 </style>
 </head>
 <body>
 <div id="app">
-<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;min-height:36px">
+<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;background:var(--bg-alt);border-bottom:1px solid var(--border);min-height:36px">
 <button class="btn btn-ghost btn-xs" onclick="A.toggleSide()" style="font-size:14px">&equiv;</button>
 <span style="font-weight:700;font-size:14px">SWA v0.3</span>
-<select id="fileType" style="font-size:11px;padding:1px 4px;border:1px solid #d0d0d0;border-radius:3px"><option value="course">课件</option><option value="hw">作业</option></select>
-<label class="btn btn-outline btn-primary btn-xs" style="cursor:pointer">Upload<input type="file" style="display:none" accept=".pdf,.docx,.doc,.md,.txt" onchange="A.upload(this)"></label>
+<select id="fileType" style="font-size:11px;padding:1px 4px;border:1px solid var(--border-strong);border-radius:3px;background:var(--card);color:var(--fg)"><option value="course">课件</option><option value="hw">作业</option></select>
+<label class="btn btn-outline btn-primary btn-xs" style="cursor:pointer">Upload<input type="file" class="hidden" accept=".pdf,.docx,.doc,.md,.txt" onchange="A.upload(this)"></label>
 <button class="btn btn-ghost btn-xs" onclick="A.newCard()">+New</button>
-<div style="flex:1"></div>
+<div class="flex-1"></div>
 <button class="btn btn-ghost btn-xs" onclick="A.showExam()">Exam</button>
 <button class="btn btn-ghost btn-xs" onclick="A.showSettings()">Sets</button>
 <button class="btn btn-ghost btn-xs" onclick="A.showLogs()">Log</button>
+<button id="swThemeBtn" class="btn btn-ghost btn-xs" onclick="A.swToggleTheme()" title="切换深色/浅色主题">🌙</button>
+<button id="swGraphBtn" class="btn btn-ghost btn-xs" onclick="A.swShowGraph()" title="知识图谱">🕸 Graph</button>
 <input class="input input-sm" style="width:120px" placeholder="Search" onkeydown="if(event.key==='Enter')A.search()">
 </div>
 
 <div style="display:flex;flex:1;overflow:hidden">
-<aside id="sidebar" style="width:260px;overflow-y:auto;flex-shrink:0;background:#fff;border-right:1px solid #e0e0e0;padding:4px"><div style="padding:4px;color:#999">Loading...</div></aside>
-<main id="main" style="flex:1;overflow-y:auto;padding:16px"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Select a category</div></main>
+<aside id="sidebar" style="width:260px;overflow-y:auto;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);padding:4px"><div style="padding:4px;color:var(--muted)">Loading...</div></aside>
+<main id="main" style="flex:1;overflow-y:auto;padding:16px"><div class="flex items-center justify-center h-100 text-gray-400">Select a category</div></main>
 </div>
 
-<div style="background:#f5f5f5;border-top:1px solid #e0e0e0">
+<div style="background:var(--bg-alt);border-top:1px solid var(--border)">
 <button class="btn btn-ghost btn-xs" style="width:100%;border-radius:0" onclick="A.toggleChat()"><span id="chatArrow">+</span> Chat</button>
 <div id="chatPanel" style="display:none;padding:0 12px 8px">
 <div style="display:flex;gap:4px;margin-bottom:4px">
@@ -92,52 +144,107 @@ body{margin:0;overflow:hidden;height:100vh;font:13px/1.5 system-ui,sans-serif;co
 <button class="btn btn-xs" id="btnAgent" onclick="A.setMode('agent')">Agent</button>
 </div>
 <div id="chatMsgs" style="height:128px;overflow-y:auto;margin-bottom:4px"></div>
-<div style="display:flex;gap:4px"><input class="input input-sm" style="flex:1" id="chatMsgInput" onkeydown="if(event.key==='Enter')A.chatSend()"><button class="btn btn-primary btn-xs" onclick="A.chatSend()">Send</button></div>
+<div style="display:flex;gap:4px"><input class="input input-sm flex-1" id="chatMsgInput" onkeydown="if(event.key==='Enter')A.chatSend()"><button class="btn btn-primary btn-xs" onclick="A.chatSend()">Send</button></div>
 </div>
 </div>
 
-<div id="qzModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:600px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:16px">Quiz</span><button class="btn btn-ghost btn-xs" onclick="A.hide('qzModal')">X</button></div>
+<div id="qzModal" class="modal-mask" style="display:none"><div class="bg-white rounded-8 shadow" style="width:600px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
+<div class="flex justify-between items-center mb-8"><span class="font-bold" style="font-size:16px">Quiz</span><button class="btn btn-ghost btn-xs" onclick="A.hide('qzModal')">X</button></div>
 <div id="qzBody"></div>
 </div></div>
 
-<div id="edModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:380px;max-width:90vw;padding:16px">
-<span style="font-weight:700;font-size:16px">Edit Card</span>
-<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Title</label><input class="input input-sm" id="edTitle"></div>
-<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Category</label><input class="input input-sm" id="edCat"></div>
-<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Content</label><textarea class="textarea" style="height:160px" id="edContent"></textarea></div>
-<div style="margin-top:8px"><label style="font-size:11px;font-weight:600">Examples (one per line)</label><textarea class="textarea" style="height:80px" id="edExamples"></textarea></div>
+<div id="edModal" class="modal-mask" style="display:none"><div class="bg-white rounded-8 shadow" style="width:380px;max-width:90vw;padding:16px">
+<span class="font-bold" style="font-size:16px">Edit Card</span>
+<div class="mt-8"><label style="font-size:11px;font-weight:600">Title</label><input class="input input-sm" id="edTitle"></div>
+<div class="mt-8"><label style="font-size:11px;font-weight:600">Category</label><input class="input input-sm" id="edCat"></div>
+<div class="mt-8"><label style="font-size:11px;font-weight:600">Content</label><textarea class="textarea" style="height:160px" id="edContent"></textarea></div>
+<div class="mt-8"><label style="font-size:11px;font-weight:600">Examples (one per line)</label><textarea class="textarea" style="height:80px" id="edExamples"></textarea></div>
 <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
 <button class="btn btn-ghost btn-sm" onclick="A.hide('edModal')">Cancel</button>
 <button class="btn btn-primary btn-sm" onclick="A.saveEdit()">Save</button>
 </div>
 </div></div>
 
-<div id="exModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:600px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:16px">Exam</span><button class="btn btn-ghost btn-xs" onclick="A.hide('exModal')">X</button></div>
+<div id="exModal" class="modal-mask" style="display:none"><div class="bg-white rounded-8 shadow" style="width:600px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
+<div class="flex justify-between items-center mb-8"><span class="font-bold" style="font-size:16px">Exam</span><button class="btn btn-ghost btn-xs" onclick="A.hide('exModal')">X</button></div>
 <div id="exBody"></div>
 </div></div>
 
-<div id="stModal" class="modal-mask" style="display:none"><div style="background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.2);width:500px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;font-size:16px">Settings</span><button class="btn btn-ghost btn-xs" onclick="A.hide('stModal')">X</button></div>
+<div id="stModal" class="modal-mask" style="display:none"><div class="bg-white rounded-8 shadow" style="width:500px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px">
+<div class="flex justify-between items-center mb-8"><span class="font-bold" style="font-size:16px">Settings</span><button class="btn btn-ghost btn-xs" onclick="A.hide('stModal')">X</button></div>
 <div id="stBody"></div>
 </div></div>
+
+<div id="swGraphModal" class="modal-mask" style="display:none">
+<div style="background:var(--card);color:var(--fg);border-radius:10px;box-shadow:0 8px 40px var(--shadow);width:92vw;max-width:1100px;height:86vh;display:flex;flex-direction:column;padding:12px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span class="font-bold" style="font-size:16px">知识图谱</span>
+<button class="btn btn-ghost btn-xs" onclick="A.hide('swGraphModal')">X</button>
+</div>
+<div id="swGraphBody" style="flex:1;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--bg)">
+<svg id="swGraphSvg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
+</div>
+<div id="swGraphNote" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+</div>
+</div>
 
 <div id="lgPanel" style="display:none;position:fixed;bottom:0;right:0;width:50%;height:50%;background:#1e1e2e;color:#a6e3a1;z-index:200;flex-direction:column;font-family:monospace;font-size:12px;box-shadow:-4px -4px 16px rgba(0,0,0,.3)">
 <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#181825"><span style="font-weight:600;color:#cdd6f4">Logs</span><button class="btn btn-ghost btn-xs" style="color:#cdd6f4" onclick="A.hidePanel()">X</button></div>
 <div id="lgBody" style="flex:1;overflow-y:auto;padding:4px 8px;white-space:pre-wrap;line-height:1.4"></div>
 </div>
+<div id="bootstrapMask" role="dialog" aria-modal="true" aria-label="首次配置 API Key">
+<div class="bootstrap-card">
+<div style="font-size:22px;font-weight:800;color:#0f172a">🍌 StudyWiki-Agent</div>
+<div style="font-size:13px;color:#64748b;margin-top:4px">首次配置</div>
+<p style="font-size:12px;color:#475569;margin:12px 0 4px;line-height:1.6">配置大模型 API Key 后才能开始使用。主界面已被锁定，此步骤不可跳过。</p>
+<label for="bsProvider">Provider</label>
+<select id="bsProvider" onchange="A.bsProviderChanged()">
+<option value="deepseek">DeepSeek</option>
+
+<option value="openai">OpenAI</option>
+</select>
+<label for="bsKey">API Key</label>
+<div style="display:flex;gap:6px">
+<input id="bsKey" type="password" autocomplete="off" placeholder="sk-..." style="flex:1">
+<button class="btn btn-ghost btn-xs" type="button" onclick="A.bsToggleKey()" style="width:64px;border:1px solid #cbd5e1">Show</button>
+</div>
+<label for="bsBaseUrl">API Base URL</label>
+<input id="bsBaseUrl" type="text" autocomplete="off" placeholder="https://api.deepseek.com">
+<div style="display:flex;gap:8px;margin-top:14px">
+<button class="btn btn-outline btn-sm" type="button" id="bsTestBtn" onclick="A.bsTestKey()" style="flex:1">测试连接</button>
+<button class="btn btn-primary btn-sm" type="button" id="bsSaveBtn" onclick="A.bsSaveKey()" style="flex:1">保存并进入</button>
+</div>
+<div id="bsStatus" role="status" aria-live="polite"></div>
+</div>
+</div>
+
 
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
 const A={
-mode:'ask',ws:null,groups:[],cats:{},aliases:{},card:null,currentKB:'',kbs:[],
-async init(){await this.loadKB();await this.load();await this.wsConnect()},
-async switchKB(id){if(!id||id===this.currentKB)return;try{await fetch('/api/kb/switch/'+id,{method:'POST'});await this.loadKB();await this.load()}catch(e){alert('Switch failed')}},
-async showKBMgmt(){this.show('stModal');let h='<div style="margin-bottom:8px;font-weight:700;font-size:14px">Knowledge Bases</div>';h+='<div id="kbList"></div>';h+='<div style="margin-top:8px;display:flex;gap:4px"><input id="kbNameInput" class="input input-sm" style="flex:1" placeholder="New KB name"><button class="btn btn-primary btn-xs" onclick="A.createKB()">Create</button></div><div style="margin-top:8px;text-align:right"><button class="btn btn-ghost btn-xs" onclick="A.hide(\'stModal\')">Close</button></div>';$('stBody').innerHTML=h;this.renderKBList()},
-renderKBList(){const cur=this.currentKB||'';let h='<table style="width:100%;font-size:12px;border-collapse:collapse">';for(const kb of this.kbs){h+='<tr style="border-bottom:1px solid #eee"><td style="padding:4px">'+(kb.id===cur?'<b>': '')+kb.name+(kb.id===cur?'</b>':'')+'</td><td style="padding:4px;text-align:right"><button class="btn btn-ghost btn-xs" onclick="A.renameKB(\''+kb.id+'\',\''+kb.name+'\')" style="margin-right:4px">Rename</button>'+(kb.id!==cur?'<button class="btn btn-ghost btn-xs btn-error" onclick="A.delKB(\''+kb.id+'\')">Del</button>':'')+'</td></tr>'}h+='</table>';$('kbList').innerHTML=h},
+mode:'ask',ws:null,groups:[],cats:{},aliases:{},card:null,currentKB:'',kbs:[],bootstrap:{required:false,provider:'deepseek',status:'idle',error:null,keyTail:''},
+_stream:null,_step:null,_approval:null,_approvalTimer:null,_uploadTimer:null,_uploadTaskId:null,_uploadCancelled:false,_graph:null,
+async init(){this.swThemeInit();await this.checkBootstrap();if(!this.bootstrap.required){await this.startApp()}},
+async checkBootstrap(){try{const r=await fetch('/api/bootstrap/status');const d=await r.json();if(d.status==='success'){this.bootstrap={required:!!d.data.required,provider:d.data.provider||'deepseek',baseUrl:d.data.base_url||'',status:d.data.required?'required':'configured',error:null,keyTail:d.data.key_tail||''};if(this.bootstrap.required){this.showBootstrap();this.bsApplyProvider()}}else{this.bootstrap.required=true;this.showBootstrap()}}catch(e){this.bootstrap.required=true;this.showBootstrap();this.bsSetStatus('无法连接本地服务: '+e.message,true)}},
+async startApp(){await this.loadKB();await this.load();await this.wsConnect()},
+showBootstrap(){const m=$('bootstrapMask');if(m){m.style.display='flex';m.style.alignItems='center';m.style.justifyContent='center'}this.bsSetStatus('请填写 API Key 并完成验证',false)},
+hideBootstrap(){const m=$('bootstrapMask');if(m)m.style.display='none'},
+bsSetStatus(msg,isError){const s=$('bsStatus');if(!s)return;s.textContent=msg||'';s.className=isError?'error':((msg&&(msg.startsWith('连接成功')||msg.startsWith('配置成功')))?'ok':'')},
+bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const base=$('bsBaseUrl');if(base&&!base.value)base.value=p==='openai'?'https://api.openai.com/v1':'https://api.deepseek.com';return p},
+bsProviderChanged(){this.bsApplyProvider();this.bsSetStatus('',false)},
+bsToggleKey(){const k=$('bsKey');if(!k)return;k.type=k.type==='password'?'text':'password'},
+bsPayload(){return{provider:this.bsApplyProvider(),api_key:$('bsKey').value.trim(),base_url:$('bsBaseUrl').value.trim()}},
+bsBusy(busy){for(const id of['bsTestBtn','bsSaveBtn']){const b=$(id);if(b)b.disabled=busy}if($('bsKey'))$('bsKey').disabled=busy;if($('bsProvider'))$('bsProvider').disabled=busy;if($('bsBaseUrl'))$('bsBaseUrl').disabled=busy},
+async bsTestKey(){const p=this.bsPayload();if(!p.api_key){this.bsSetStatus('请先填写 API Key',true);return}this.bsBusy(true);this.bsSetStatus('正在验证 Key ...',false);try{const r=await fetch('/api/bootstrap/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const d=await r.json();if(d.status==='success'&&d.data?.ok){this.bsSetStatus('连接成功: '+d.data.key_tail,false)}else{this.bsSetStatus((d.message||d.detail||'验证失败')+(d.error_code?' ('+d.error_code+')':''),true)}}catch(e){this.bsSetStatus('网络错误: '+e.message,true)}finally{this.bsBusy(false)}},
+async bsSaveKey(){const p=this.bsPayload();if(!p.api_key){this.bsSetStatus('请先填写 API Key',true);return}this.bsBusy(true);this.bsSetStatus('正在验证并保存 ...',false);try{const r=await fetch('/api/bootstrap/configure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const d=await r.json();if(d.status==='success'&&d.data?.provider){this.bootstrap.required=false;this.bootstrap.status='configured';this.bsSetStatus('配置成功，正在进入 ...',false);this.hideBootstrap();this.bsBusy(false);await this.startApp()}else{this.bsSetStatus((d.message||d.detail||'保存失败')+(d.error_code?' ('+d.error_code+')':''),true);this.bsBusy(false)}}catch(e){this.bsSetStatus('网络错误: '+e.message,true);this.bsBusy(false)}},
+
+async switchKB(id){if(!id||id===this.currentKB)return;try{$('main').innerHTML='<div class="flex items-center justify-center h-100 text-gray-400"><div class="spinner"></div><span style="margin-left:8px">Switching KB...</span></div>';await fetch('/api/kb/switch/'+id,{method:'POST'});await this.loadKB();await this.load()}catch(e){$('main').innerHTML='<div class="flex items-center justify-center h-100 text-red">Switch failed: '+e.message+'<br><button class="btn btn-primary btn-xs" onclick="location.reload()">Reload</button></div>'}},
+async showKBMgmt(){this.show('stModal');let h='<div style="margin-bottom:8px;font-weight:700;font-size:14px">Knowledge Bases</div>';h+='<div id="kbList"></div>';h+='<div style="margin-top:8px;display:flex;gap:4px"><input id="kbNameInput" class="input input-sm flex-1" placeholder="New KB name"><button class="btn btn-primary btn-xs" onclick="A.createKB()">Create</button></div><div style="margin-top:8px;text-align:right"><button class="btn btn-ghost btn-xs" onclick="A.hide(\'stModal\')">Close</button></div>';$('stBody').innerHTML=h;this.renderKBList()},
+renderKBList(){const cur=this.currentKB||'';let h='<table style="width:100%;font-size:12px;border-collapse:collapse">';for(const kb of this.kbs){h+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px">'+(kb.id===cur?'<b>': '')+kb.name+(kb.id===cur?'</b>':'')+'</td><td style="padding:4px;text-align:right"><button class="btn btn-ghost btn-xs" onclick="A.renameKB(\''+kb.id+'\',\''+kb.name+'\')" style="margin-right:4px">Rename</button>'+(kb.id!==cur?'<button class="btn btn-ghost btn-xs btn-error" onclick="A.delKB(\''+kb.id+'\')">Del</button>':'')+'</td></tr>'}h+='</table>';$('kbList').innerHTML=h},
 async renameKB(id,name){const n=prompt('New name:',name);if(!n)return;try{const r=await fetch('/api/kb/rename/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});const d=await r.json();if(d.status==='success'){await this.loadKB();this.renderKBList();this.renderSidebar()}}catch(e){alert('Rename failed')}},
 async delKB(id){if(!confirm('Delete KB?'))return;try{const r=await fetch('/api/kb/'+id,{method:'DELETE'});const d=await r.json();if(d.status==='success'){await this.loadKB();this.renderKBList();await this.load()}}catch(e){alert('Delete failed')}},
 async createKB(){const name=$('kbNameInput').value.trim();if(!name)return;try{const r=await fetch('/api/kb/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();if(d.status==='success'){await this.loadKB();await this.switchKB(d.data.id)}else alert('Create failed: '+(d.detail||d.message))}catch(e){alert('Create failed: '+e.message)}},
@@ -165,15 +272,15 @@ this.groups.push(group);
 this.renderSidebar();
 },
 renderSidebar(){
-let h='<div style="display:flex;align-items:center;gap:4px;padding:0 4px 4px;border-bottom:1px solid #e0e0e0;margin-bottom:6px">';
-h+='<select id="kbSelect" style="flex:1;font-size:12px;padding:2px 4px;border:1px solid #d0d0d0;border-radius:4px" onchange="A.switchKB(this.value)">';
+let h='<div style="display:flex;align-items:center;gap:4px;padding:0 4px 4px;border-bottom:1px solid var(--border);margin-bottom:6px">';
+h+='<select id="kbSelect" style="flex:1;font-size:12px;padding:2px 4px;border:1px solid var(--border-strong);border-radius:4px;background:var(--card);color:var(--fg)" onchange="A.switchKB(this.value)">';
 for(const kb of this.kbs||[]){h+='<option value="'+kb.id+'"'+(kb.id===this.currentKB?' selected':'')+'>'+kb.name+' ('+(kb.card_count||0)+')</option>'}
 h+='</select><button class="btn btn-ghost btn-xs" onclick="A.showKBMgmt()" style="padding:0 4px;font-size:14px">+</button></div>';
-h+='<div style="font-size:11px;font-weight:600;color:#999;padding:0 4px;margin-bottom:4px">Categories</div>';
+h+='<div style="font-size:11px;font-weight:600;color:var(--muted);padding:0 4px;margin-bottom:4px">Categories</div>';
 for(const g of this.groups){
-h+='<div class="cursor-pointer" style="padding:2px 4px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="'+(g.children.length?'A.tg('+g.id+')':'A.lc(\''+g.name+'\')')+'" onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'\'">';
-h+='<span style="width:10px;font-size:11px;display:inline-block">'+(g.children.length?(g.open?'-':'+'):'')+'</span><span>'+g.name+'</span><span style="font-size:11px;color:#999;margin-left:auto">'+g.total+'</span></div>';
-if(g.open)for(const c of g.children)h+='<div class="cursor-pointer" style="padding:2px 4px;padding-left:20px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="A.lc(\''+c.id+'\')" onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'\'"><span>'+c.name+'</span><span style="font-size:11px;color:#999;margin-left:auto">'+c.count+'</span></div>';
+h+='<div class="cursor-pointer" style="padding:2px 4px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="'+(g.children.length?'A.tg('+g.id+')':'A.lc(\''+g.name+'\')')+'" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">';
+h+='<span style="width:10px;font-size:11px;display:inline-block">'+(g.children.length?(g.open?'-':'+'):'')+'</span><span>'+g.name+'</span><span style="font-size:11px;color:var(--muted);margin-left:auto">'+g.total+'</span></div>';
+if(g.open)for(const c of g.children)h+='<div class="cursor-pointer" style="padding:2px 4px;padding-left:20px;display:flex;align-items:center;gap:4px;border-radius:4px" onclick="A.lc(\''+c.id+'\')" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'"><span>'+c.name+'</span><span style="font-size:11px;color:var(--muted);margin-left:auto">'+c.count+'</span></div>';
 }
 $('sidebar').innerHTML=h;
 },
@@ -182,47 +289,243 @@ lc(full){this.listCards(full)},oc(id){this.openCard(id)},
 listCards(full){
 const d=this.cats[full];if(!d||!d.cards)return;
 let h='<button class="btn btn-ghost btn-xs" onclick="A.mainClear()">Back</button><div style="font-size:14px;font-weight:600;margin:8px 0">Cards:</div>';
-for(const ca of d.cards)h+='<div class="cursor-pointer" style="padding:4px 8px;border-radius:4px;color:#2563eb;font-size:12px" onclick="A.oc(\''+ca.id+'\')" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'">'+ca.title+'</div>';
+for(const ca of d.cards)h+='<div class="cursor-pointer" style="padding:4px 8px;border-radius:4px;color:var(--accent);font-size:12px" onclick="A.oc(\''+ca.id+'\')" onmouseover="this.style.background=\'var(--hover-accent)\'" onmouseout="this.style.background=\'\'">'+esc(ca.title)+'</div>';
 $('main').innerHTML=h;
 },
 async openCard(id){
-try{const r=await fetch('/api/cards/'+id);const d=await r.json();
+try{$('main').innerHTML='<div class="flex items-center justify-center h-100 text-gray-400"><div class="spinner"></div><span style="margin-left:8px">Loading card...</span></div>';const r=await fetch('/api/cards/'+id);const d=await r.json();
 if(d.status!=='success')return;const ca=d.data;this.card=ca;
 let h='<button class="btn btn-ghost btn-xs" onclick="A.mainClear()">Back</button>';
-h+='<div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><div><span style="font-size:18px;font-weight:700">'+ca.title+'</span><span class="badge badge-outline badge-sm" style="margin-left:8px">'+ca.category+'</span></div>';
+h+='<div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><div><span style="font-size:18px;font-weight:700">'+esc(ca.title)+'</span><span class="badge badge-outline badge-sm" style="margin-left:8px">'+esc(ca.category)+'</span></div>';
 h+='<div style="display:flex;gap:4px;margin-left:auto"><button class="btn btn-primary btn-xs" onclick="A.startQuiz()">Quiz</button><button class="btn btn-ghost btn-xs" onclick="A.editCard()">Edit</button><button class="btn btn-ghost btn-xs btn-error" onclick="A.delCard()">Del</button></div></div>';
 h+='<div class="divider"></div><div class="prose">'+this.linkify(ca.content)+'</div>';
 if(ca.examples&&ca.examples.length){h+='<div style="font-weight:600;font-size:12px;margin-top:12px">Examples</div>';for(const e of ca.examples)h+='<div style="margin:2px 0;margin-left:12px;font-size:12px">'+this.linkify(e)+'</div>'}
 $('main').innerHTML=h;
-}catch(e){}
+}catch(e){$('main').innerHTML='<div class="flex items-center justify-center h-100 text-red">Failed to load card</div>'}
 },
-mainClear(){$('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Select a category</div>';this.card=null},
+mainClear(){$('main').innerHTML='<div class="flex items-center justify-center h-100 text-gray-400">Select a category</div>';this.card=null},
 async delCard(){if(!this.card||!confirm('Delete: '+this.card.title+'?'))return;try{await fetch('/api/cards/'+this.card.id,{method:'DELETE'});this.mainClear();await this.load()}catch(e){alert('Delete failed')}},
 editCard(){if(!this.card)return;$('edTitle').value=this.card.title;$('edCat').value=this.card.category;$('edContent').value=this.card.content||'';$('edExamples').value=(this.card.examples||[]).join('\n');this.show('edModal')},
 async saveEdit(){const title=$('edTitle').value.trim();if(!title)return;const body={title,category:$('edCat').value||'未分类',content:$('edContent').value,examples:$('edExamples').value.split('\n').filter(Boolean)};try{await fetch('/api/cards/'+this.card.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});this.hide('edModal');await this.openCard(this.card.id)}catch(e){alert('Save failed')}},
 async startQuiz(){if(!this.card)return;$('qzBody').innerHTML='<button class="btn btn-primary btn-sm" style="width:100%" onclick="A.genQ()">Generate Questions</button>';this.show('qzModal');this.qz={card:this.card.id,qs:[],results:[],done:false,score:0,max:0}},
-async genQ(){if(!this.qz)return;$('qzBody').innerHTML='<div class="spinner" style="margin:8px auto"></div><div style="text-align:center;font-size:12px">Generating...</div>';try{const r=await fetch('/api/quiz/generate/'+this.qz.card,{method:'POST'});const d=await r.json();if(d.status!=='success')throw new Error('Failed');this.qz.qs=d.data.questions.map(q=>({...q,answer:''}));let h='';for(let i=0;i<this.qz.qs.length;i++){const q=this.qz.qs[i];h+='<div style="margin-top:8px;border:1px solid #e0e0e0;border-radius:4px;padding:8px"><p style="font-weight:600;font-size:12px">Q'+(i+1)+'. '+q.question+'</p><textarea class="textarea" style="width:100%;margin-top:4px;height:80px" id="qa'+i+'"></textarea></div>'}h+='<button class="btn btn-success btn-sm" style="width:100%;margin-top:8px" onclick="A.gradeQ()">Submit for Grading</button>';$('qzBody').innerHTML=h}catch(e){$('qzBody').innerHTML='<p style="color:#dc2626;font-size:12px">Generation failed</p><button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px" onclick="A.startQuiz()">Retry</button>'}},
-async gradeQ(){const answers=[];for(let i=0;i<this.qz.qs.length;i++)answers.push({question:this.qz.qs[i].question,answer:($('qa'+i)||{}).value||''});$('qzBody').innerHTML='<div class="spinner" style="margin:16px auto"></div><div style="text-align:center;font-size:12px;color:#999">Grading...</div>';try{const r=await fetch('/api/quiz/grade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:this.qz.card,answers})});const d=await r.json();if(d.status!=='success')throw new Error('Failed');let h='';const res=d.data.results||[];for(let i=0;i<this.qz.qs.length;i++){const r2=res[i]||{score:0,comment:'',reference:''};const bg=r2.score>=8?'bg-green-50':r2.score>=5?'bg-yellow-50':'bg-red-50';const bc=r2.score>=8?'border-green-200':r2.score>=5?'border-yellow-200':'border-red-200';h+='<div style="margin-top:8px;border:1px solid;border-radius:4px;padding:8px" class="'+bg+' '+bc+'"><p style="font-weight:600;font-size:12px">Q'+(i+1)+': '+this.qz.qs[i].question+' <span style="font-size:11px;padding:0 4px;border:1px solid #d0d0d0;border-radius:4px">'+r2.score+'/10</span></p><p style="font-size:11px;margin-top:4px"><b>Your answer:</b> '+answers[i].answer+'</p><p style="font-size:11px;margin-top:2px"><b>Feedback:</b> '+r2.comment+'</p>'+(r2.reference?'<p style="font-size:11px;margin-top:2px;color:#15803d"><b>Reference:</b> '+r2.reference+'</p>':'')+'</div>'}h+='<div style="text-align:center;font-size:16px;font-weight:700;margin-top:12px">Score: '+d.data.total_score+' / '+d.data.max_score+' ('+(d.data.total_score/d.data.max_score*100).toFixed(0)+'%)</div>';h+='<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:12px" onclick="A.hide(\'qzModal\')">Close</button>';h+='<button class="btn btn-primary btn-sm" style="width:100%;margin-top:4px" onclick="A.mergeQ()">Merge into Card</button>';$('qzBody').innerHTML=h}catch(e){$('qzBody').innerHTML='<p style="color:#dc2626">Grading failed: '+e.message+'</p>'}},
-async mergeQ(){if(!this.qz)return;$('qzBody').innerHTML='<div class="spinner" style="margin:16px auto"></div><div style="text-align:center;font-size:12px;color:#999">Merging into card...</div>';const answers=[];for(let i=0;i<this.qz.qs.length;i++)answers.push({question:this.qz.qs[i].question,answer:($('qa'+i)||{}).value||''});try{const r=await fetch('/api/quiz/merge/'+this.qz.card,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:this.qz.card,answers})});const d=await r.json();if(d.status==='success'){this.hide('qzModal');this.openCard(this.qz.card)}else alert('Merge failed: '+(d.detail||d.message))}catch(e){alert('Merge failed')}},
-async showExam(){this.show('exModal');let h='<p style="font-size:12px;margin-bottom:8px">Select categories:</p>';for(const g of this.groups)h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0"><input type="checkbox" class="checkbox" id="exG'+g.id+'" checked> <b>'+g.name+'</b> ('+g.total+')</label>';h+='<button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px" onclick="A.genExam()">Generate Exam</button>';$('exBody').innerHTML=h},
-async genExam(){const sel=[];for(const g of this.groups)if($('exG'+g.id).checked)sel.push(g.name);const ids=[];for(const gn of sel){const d=this.cats[gn];if(d&&d.cards)for(const ca of d.cards)ids.push(ca.id);for(const g of this.groups)if(g.name===gn)for(const c of g.children)if(this.cats[c.id])for(const ca of this.cats[c.id].cards)ids.push(ca.id)}if(!ids.length){alert('No cards selected');return}$('exBody').innerHTML='<div class="spinner" style="margin:8px auto"></div><div style="text-align:center;font-size:12px">Generating exam from '+ids.length+' cards...</div>';try{const r=await fetch('/api/quiz/exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_ids:ids})});const d=await r.json();if(d.status!=='success')throw new Error('Failed');let h='';const qs=d.data.questions||[];for(let i=0;i<qs.length;i++)h+='<div style="margin-top:8px;border:1px solid #e0e0e0;border-radius:4px;padding:8px"><p style="font-weight:600;font-size:12px">Q'+(i+1)+'. '+qs[i].question+'</p><textarea class="textarea" style="width:100%;margin-top:4px;height:80px" id="exA'+i+'"></textarea></div>';h+='<button class="btn btn-success btn-sm" style="width:100%;margin-top:8px" onclick="A.gradeExam()">Submit</button>';$('exBody').innerHTML=h;this.examQs=qs}catch(e){$('exBody').innerHTML='<p style="color:#dc2626">'+e.message+'</p>'}},
+async genQ(){if(!this.qz)return;$('qzBody').innerHTML='<div class="spinner spinner-margin"></div><div style="text-align:center;font-size:12px">Generating...</div>';try{const r=await fetch('/api/quiz/generate/'+this.qz.card,{method:'POST'});const d=await r.json();if(d.status!=='success')throw new Error('Failed');this.qz.qs=d.data.questions.map(q=>({...q,answer:''}));let h='';for(let i=0;i<this.qz.qs.length;i++){const q=this.qz.qs[i];h+='<div style="margin-top:8px;border:1px solid var(--border);border-radius:4px;padding:8px"><p class="font-semibold text-sm">Q'+(i+1)+'. '+esc(q.question)+'</p><textarea class="textarea" style="width:100%;margin-top:4px;height:80px" id="qa'+i+'"></textarea></div>'}h+='<button class="btn btn-success btn-sm w-full mt-8" onclick="A.gradeQ()">Submit for Grading</button>';$('qzBody').innerHTML=h}catch(e){$('qzBody').innerHTML='<p class="text-red text-sm">Generation failed</p><button class="btn btn-primary btn-sm w-full mt-8" onclick="A.startQuiz()">Retry</button>'}},
+async gradeQ(){const answers=[];for(let i=0;i<this.qz.qs.length;i++)answers.push({question:this.qz.qs[i].question,answer:($('qa'+i)||{}).value||''});$('qzBody').innerHTML='<div class="spinner" style="margin:16px auto"></div><div class="text-center text-sm text-gray-400">Grading...</div>';try{const r=await fetch('/api/quiz/grade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:this.qz.card,answers})});const d=await r.json();if(d.status!=='success')throw new Error('Failed');let h='';const res=d.data.results||[];for(let i=0;i<this.qz.qs.length;i++){const r2=res[i]||{score:0,comment:'',reference:''};h+='<div style="margin-top:8px;border:1px solid var(--border);border-radius:4px;padding:8px"><p class="font-semibold text-sm">Q'+(i+1)+': '+esc(this.qz.qs[i].question)+' <span style="font-size:11px;padding:0 4px;border:1px solid var(--border-strong);border-radius:4px">'+r2.score+'/10</span></p><p style="font-size:11px;margin-top:4px"><b>Your answer:</b> '+esc(answers[i].answer)+'</p><p style="font-size:11px;margin-top:2px"><b>Feedback:</b> '+esc(r2.comment)+'</p>'+(r2.reference?'<p style="font-size:11px;margin-top:2px;color:var(--ok)"><b>Reference:</b> '+esc(r2.reference)+'</p>':'')+'</div>'}h+='<div style="text-align:center;font-size:16px;font-weight:700;margin-top:12px">Score: '+d.data.total_score+' / '+d.data.max_score+' ('+(d.data.total_score/d.data.max_score*100).toFixed(0)+'%)</div>';h+='<button class="btn btn-ghost btn-sm w-full mt-12" onclick="A.hide(\'qzModal\')">Close</button>';h+='<button class="btn btn-primary btn-sm" style="width:100%;margin-top:4px" onclick="A.mergeQ()">Merge into Card</button>';$('qzBody').innerHTML=h}catch(e){$('qzBody').innerHTML='<p class="text-red">Grading failed: '+e.message+'</p>'}},
+async mergeQ(){if(!this.qz)return;$('qzBody').innerHTML='<div class="spinner" style="margin:16px auto"></div><div class="text-center text-sm text-gray-400">Merging into card...</div>';const answers=[];for(let i=0;i<this.qz.qs.length;i++)answers.push({question:this.qz.qs[i].question,answer:($('qa'+i)||{}).value||''});try{const r=await fetch('/api/quiz/merge/'+this.qz.card,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:this.qz.card,answers})});const d=await r.json();if(d.status==='success'){this.hide('qzModal');this.openCard(this.qz.card)}else alert('Merge failed: '+(d.detail||d.message))}catch(e){alert('Merge failed')}},
+async showExam(){this.show('exModal');let h='<p style="font-size:12px;margin-bottom:8px">Select categories:</p>';for(const g of this.groups)h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0"><input type="checkbox" class="checkbox" id="exG'+g.id+'" checked> <b>'+esc(g.name)+'</b> ('+g.total+')</label>';h+='<button class="btn btn-primary btn-sm w-full mt-12" onclick="A.genExam()">Generate Exam</button>';$('exBody').innerHTML=h},
+async genExam(){const sel=[];for(const g of this.groups)if($('exG'+g.id).checked)sel.push(g.name);const ids=[];for(const gn of sel){const d=this.cats[gn];if(d&&d.cards)for(const ca of d.cards)ids.push(ca.id);for(const g of this.groups)if(g.name===gn)for(const c of g.children)if(this.cats[c.id])for(const ca of this.cats[c.id].cards)ids.push(ca.id)}if(!ids.length){alert('No cards selected');return}$('exBody').innerHTML='<div class="spinner spinner-margin"></div><div style="text-align:center;font-size:12px">Generating exam from '+ids.length+' cards...</div>';try{const r=await fetch('/api/quiz/exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_ids:ids})});const d=await r.json();if(d.status!=='success')throw new Error('Failed');let h='';const qs=d.data.questions||[];for(let i=0;i<qs.length;i++)h+='<div style="margin-top:8px;border:1px solid var(--border);border-radius:4px;padding:8px"><p class="font-semibold text-sm">Q'+(i+1)+'. '+esc(qs[i].question)+'</p><textarea class="textarea" style="width:100%;margin-top:4px;height:80px" id="exA'+i+'"></textarea></div>';h+='<button class="btn btn-success btn-sm w-full mt-8" onclick="A.gradeExam()">Submit</button>';$('exBody').innerHTML=h;this.examQs=qs}catch(e){$('exBody').innerHTML='<p class="text-red">'+esc(e.message)+'</p>'}},
 async gradeExam(){if(!this.examQs)return;alert('Exam submitted!');this.hide('exModal')},
 async showLogs(){this.show('lgPanel');await this.refreshLogs();if(this._logTimer)clearInterval(this._logTimer);this._logTimer=setInterval(()=>this.refreshLogs(),3000)},
-async refreshLogs(){try{const r=await fetch('/api/logs?n=200');const d=await r.json();if(d.status!=='success')return;let h='';const logs=d.data||[];for(const l of logs.slice(-100)){const time=l.time?.slice(11,19)||'';const level=l.level||'';const msg=l.message||'';const color=level==='ERROR'?'#f38ba8':level==='WARNING'?'#fab387':'#a6e3a1';h+='<div><span style="color:#585b70">'+time+'</span> <span style="color:'+color+'">'+level+'</span> '+msg+'</div>'}document.getElementById('lgBody').innerHTML=h}catch(e){}},
-async showSettings(){this.show('stModal');$('stBody').innerHTML='<div class="spinner" style="margin:8px auto"></div>';try{const r=await fetch('/api/settings/');const d=await r.json();if(d.status!=='success')throw new Error();const s=d.data.settings||{};let h='<div class="setting-section" style="margin-bottom:12px">';h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:2px">供应商 (Provider)</label><select id="set_LLM_PROVIDER" style="width:100%;font-size:12px;padding:3px 6px;border:1px solid #d0d0d0;border-radius:4px"><option value="deepseek" '+(s.LLM_PROVIDER==='deepseek'?'selected':'')+'>DeepSeek</option><option value="openai" '+(s.LLM_PROVIDER==='openai'?'selected':'')+'>OpenAI</option><option value="ollama" '+(s.LLM_PROVIDER==='ollama'?'selected':'')+'>Ollama（本地）</option></select></div>';h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:2px">API Key</label><input class="input input-sm" id="set_api_key" value="'+(s.DEEPSEEK_API_KEY||s.OPENAI_API_KEY||'')+'" placeholder="sk-..."></div>';h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:2px">模型 (Model)</label><input class="input input-sm" id="set_model" value="'+(s.DEEPSEEK_MODEL||s.OPENAI_MODEL||'deepseek-chat')+'" placeholder="如 deepseek-chat, gpt-4o"></div>';h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:2px">API 地址</label><input class="input input-sm" id="set_base_url" value="'+(s.DEEPSEEK_BASE_URL||s.OPENAI_BASE_URL||'https://api.deepseek.com')+'" placeholder="API base URL"></div>';h+='<div style="margin:6px 0"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:2px">温度 (Temperature)</label><input class="input input-sm" id="set_temp" value="'+(s.LLM_TEMPERATURE||'0.1')+'" placeholder="0.0 - 2.0"></div>';h+='</div><button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px" onclick="A.saveSettings()">保存设置</button><p style="font-size:10px;color:#999;margin-top:4px;text-align:center">保存后需重启服务生效</p>';$('stBody').innerHTML=h}catch(e){$('stBody').innerHTML='<p style="color:#dc2626;font-size:12px">加载失败</p>'}},
-async saveSettings(){const provider=$('set_LLM_PROVIDER').value;const apiKey=$('set_api_key').value.trim();const model=$('set_model').value.trim();const baseUrl=$('set_base_url').value.trim();const temp=$('set_temp').value.trim();const updates=[{key:'LLM_PROVIDER',value:provider}];if(apiKey){if(provider==='deepseek')updates.push({key:'DEEPSEEK_API_KEY',value:apiKey});else updates.push({key:'OPENAI_API_KEY',value:apiKey})}if(model){if(provider==='deepseek')updates.push({key:'DEEPSEEK_MODEL',value:model});else if(provider==='openai')updates.push({key:'OPENAI_MODEL',value:model});else updates.push({key:'OLLAMA_MODEL',value:model})}if(baseUrl){if(provider==='deepseek')updates.push({key:'DEEPSEEK_BASE_URL',value:baseUrl});else if(provider==='ollama')updates.push({key:'OLLAMA_BASE_URL',value:baseUrl})}if(temp)updates.push({key:'LLM_TEMPERATURE',value:temp});$('stBody').innerHTML='<div class="spinner" style="margin:8px auto"></div><div style="text-align:center;font-size:12px;color:#999">Saving...</div>';try{const r=await fetch('/api/settings/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});const d=await r.json();if(d.status==='success'){alert('已保存！重启服务生效');this.hide('stModal')}else alert('Save failed: '+(d.detail||d.message))}catch(e){alert('Save failed')}},
-linkify(t){if(!t)return'';const names=Object.entries(this.aliases).sort((a,b)=>b[0].length-a[0].length);let h=t;for(const[n,id]of names){const re=new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');h=h.replace(re,(m,o,s)=>{if(s.lastIndexOf('<',o)>s.lastIndexOf('>',o))return m;return'<a href="#" class="card-link" onclick="A.oc(\''+id+'\');return false">'+m+'</a>'})}return h},
-async search(){const q=document.querySelector('input[placeholder=Search]').value.trim();if(!q)return;const r=await fetch('/api/cards/search?q='+encodeURIComponent(q));const d=await r.json();if(d.data?.cards?.length)this.openCard(d.data.cards[0].id)},
-async upload(input){const f=input.files[0];if(!f)return;const ft=$('fileType').value;input.value='';$('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:200px"><div class="spinner"></div><span style="margin-left:12px;font-size:13px;color:#999" id="uploadStatus">Uploading...<br><span style="font-size:11px">This may take a moment</span></span></div>';const fd=new FormData();fd.append('file',f);fd.append('file_type',ft);fd.append('kb_id',this.currentKB||'');try{const r=await fetch('/api/upload',{method:'POST',body:fd});const d=await r.json();if(d.status!=='success')throw new Error(d.detail||'Failed');const taskId=d.data.task_id;$('uploadStatus').innerHTML='Parsing...<br><span style="font-size:11px" id="uploadSub">Please wait</span>';let tries=0;const poll=setInterval(async()=>{try{const r2=await fetch('/api/upload/status/'+taskId);const d2=await r2.json();const s=d2.data;if(s.status==='done'){clearInterval(poll);if(s.imported>0){$('uploadStatus').innerHTML='Deduplicating...';try{await fetch('/api/cards/deduplicate',{method:'POST'})}catch(e){}}await this.load();if(s.cards?.length)this.openCard(s.cards[0].id)}else if(s.status==='error'){clearInterval(poll);alert('Parse failed: '+s.message);this.mainClear()}}catch(e){tries++;if(tries>360){clearInterval(poll);alert('Upload timed out after 30 min');this.mainClear()}}},5000)}catch(e){alert('Upload failed: '+e.message);this.mainClear()}},
+async refreshLogs(){try{const r=await fetch('/api/logs?n=200');const d=await r.json();if(d.status!=='success')return;let h='';const logs=d.data||[];for(const l of logs.slice(-100)){const time=l.time?.slice(11,19)||'';const level=l.level||'';const msg=l.message||'';const color=level==='ERROR'?'#f38ba8':level==='WARNING'?'#fab387':'#a6e3a1';h+='<div><span style="color:#585b70">'+esc(time)+'</span> <span style="color:'+color+'">'+esc(level)+'</span> '+esc(msg)+'</div>'}document.getElementById('lgBody').innerHTML=h}catch(e){}},
+async showSettings(){this.show('stModal');$('stBody').innerHTML='<div class="spinner spinner-margin"></div>';try{const r=await fetch('/api/settings/');const d=await r.json();if(d.status!=='success')throw new Error();const s=d.data.settings||{};let h='<div class="setting-section" style="margin-bottom:12px">';h+='<div style="margin:6px 0"><label class="text-xs font-semibold block" style="margin-bottom:2px">供应商 (Provider)</label><select id="set_LLM_PROVIDER" style="width:100%;font-size:12px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:4px;background:var(--card);color:var(--fg)"><option value="deepseek" '+(s.LLM_PROVIDER==='deepseek'?'selected':'')+'>DeepSeek</option><option value="openai" '+(s.LLM_PROVIDER==='openai'?'selected':'')+'>OpenAI</option><option value="ollama" '+(s.LLM_PROVIDER==='ollama'?'selected':'')+'>Ollama（本地）</option></select></div>';h+='<div style="margin:6px 0"><label class="text-xs font-semibold block" style="margin-bottom:2px">API Key</label><input class="input input-sm" id="set_api_key" value="'+esc(s.DEEPSEEK_API_KEY||s.OPENAI_API_KEY||'')+'" placeholder="sk-..."></div>';h+='<div style="margin:6px 0"><label class="text-xs font-semibold block" style="margin-bottom:2px">模型 (Model)</label><input class="input input-sm" id="set_model" value="'+esc(s.DEEPSEEK_MODEL||s.OPENAI_MODEL||'deepseek-chat')+'" placeholder="如 deepseek-chat, gpt-4o"></div>';h+='<div style="margin:6px 0"><label class="text-xs font-semibold block" style="margin-bottom:2px">API 地址</label><input class="input input-sm" id="set_base_url" value="'+esc(s.DEEPSEEK_BASE_URL||s.OPENAI_BASE_URL||'https://api.deepseek.com')+'" placeholder="API base URL"></div>';h+='<div style="margin:6px 0"><label class="text-xs font-semibold block" style="margin-bottom:2px">温度 (Temperature)</label><input class="input input-sm" id="set_temp" value="'+(s.LLM_TEMPERATURE||'0.1')+'" placeholder="0.0 - 2.0"></div>';h+='</div><button class="btn btn-primary btn-sm w-full mt-8" onclick="A.saveSettings()">保存设置</button><p style="font-size:10px;color:var(--muted);margin-top:4px;text-align:center">保存后需重启服务生效</p>';$('stBody').innerHTML=h}catch(e){$('stBody').innerHTML='<p class="text-red text-sm">加载失败</p>'}},
+async saveSettings(){const provider=$('set_LLM_PROVIDER').value;const apiKey=$('set_api_key').value.trim();const model=$('set_model').value.trim();const baseUrl=$('set_base_url').value.trim();const temp=$('set_temp').value.trim();const updates=[{key:'LLM_PROVIDER',value:provider}];if(apiKey&&!apiKey.includes('...')&&!apiKey.includes('***')){if(provider==='deepseek')updates.push({key:'DEEPSEEK_API_KEY',value:apiKey});else updates.push({key:'OPENAI_API_KEY',value:apiKey})}if(model){if(provider==='deepseek')updates.push({key:'DEEPSEEK_MODEL',value:model});else if(provider==='openai')updates.push({key:'OPENAI_MODEL',value:model});else updates.push({key:'OLLAMA_MODEL',value:model})}if(baseUrl){if(provider==='deepseek')updates.push({key:'DEEPSEEK_BASE_URL',value:baseUrl});else if(provider==='openai')updates.push({key:'OPENAI_BASE_URL',value:baseUrl});else if(provider==='ollama')updates.push({key:'OLLAMA_BASE_URL',value:baseUrl})}if(temp)updates.push({key:'LLM_TEMPERATURE',value:temp});$('stBody').innerHTML='<div class="spinner spinner-margin"></div><div class="text-center text-sm text-gray-400">Saving...</div>';try{const r=await fetch('/api/settings/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});const d=await r.json();if(d.status==='success'){alert('已保存！重启服务生效');this.hide('stModal')}else alert('Save failed: '+(d.detail||d.message))}catch(e){alert('Save failed')}},
+linkify(t){if(!t)return'';let h=esc(t);const names=Object.entries(this.aliases).sort((a,b)=>b[0].length-a[0].length);for(const[n,id]of names){const safe=esc(n);if(!safe)continue;const re=new RegExp(safe.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');h=h.replace(re,m=>'<a href="#" class="card-link" onclick="A.oc(\''+esc(id)+'\');return false">'+m+'</a>')}return h},
+async search(){const q=document.querySelector('input[placeholder=Search]').value.trim();if(!q)return;$('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100px"><div class="spinner"></div><span style="margin-left:12px;font-size:13px;color:var(--muted)">Searching...</span></div>';const r=await fetch('/api/cards/search?q='+encodeURIComponent(q));const d=await r.json();if(d.data?.cards?.length)this.openCard(d.data.cards[0].id);else $('main').innerHTML='<div class="flex items-center justify-center h-100 text-gray-400">No matching cards found</div>'},
+async upload(input){
+const f=input.files[0];if(!f)return;const ft=$('fileType').value;input.value='';
+this.swUploadPanel(f.name||'file',null);
+const fd=new FormData();fd.append('file',f);fd.append('file_type',ft);fd.append('kb_id',this.currentKB||'');
+try{
+const r=await fetch('/api/upload',{method:'POST',body:fd});const d=await r.json();
+if(d.status!=='success')throw new Error(d.detail||d.message||'Failed');
+const taskId=d.data.task_id;this._uploadTaskId=taskId;
+this.swUploadPanel(d.data.filename||f.name,taskId);
+this.swUploadPoll(taskId);
+}catch(e){
+$('main').innerHTML='<div class="flex items-center justify-center h-100 text-red" style="flex-direction:column">上传失败: '+esc(e.message)+'<br><button class="btn btn-primary btn-xs" onclick="A.mainClear()">返回</button><button class="btn btn-primary btn-xs" style="margin-top:4px" onclick="location.reload()">重试</button></div>';
+}},
 async newCard(){const t=prompt('Title:');if(!t)return;const c=prompt('Category:','未分类');if(!c)return;try{const r=await fetch('/api/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t,category:c})});const d=await r.json();if(d.status==='success'){await this.load();this.openCard(d.data.id)}}catch(e){alert('Create failed')}},
-async wsConnect(){if(this.ws&&this.ws.readyState===WebSocket.OPEN)return;try{this.ws=new WebSocket('ws://'+location.host+'/ws/chat');this.ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==='response'){const cm=$('chatMsgs');if(cm.lastChild)cm.removeChild(cm.lastChild);this.addMsg(false,d.content);this.load()}else if(d.type==='progress'){}}catch(e){}};this.ws.onclose=()=>this.ws=null}catch(e){}},
-addMsg(user,text){const div=document.createElement('div');div.style.display='flex';div.style.flexDirection=user?'row-reverse':'row';div.innerHTML='<div style="font-size:12px;padding:4px 8px;border-radius:8px;background:'+(user?'#2563eb':'#e0e0e0')+';color:'+(user?'#fff':'#333')+';max-width:80%">'+text+'</div>';$('chatMsgs').appendChild(div);$('chatMsgs').scrollTop=$('chatMsgs').scrollHeight},
-chatSend(){const t=$('chatMsgInput').value.trim();if(!t)return;$('chatMsgInput').value='';this.addMsg(true,t);this.addMsg(false,'<div class="spinner" style="margin:4px auto"></div><div style="text-align:center;font-size:11px;color:#999">Thinking...</div>');if(!this.ws||this.ws.readyState!==WebSocket.OPEN){this.wsConnect();return}this.ws.send(JSON.stringify({type:'message',content:t,data:{mode:this.mode}}))},
-setMode(m){this.mode=m;$('btnAsk').style.background=m==='ask'?'#2563eb':'#fff';$('btnAsk').style.color=m==='ask'?'#fff':'#333';$('btnAgent').style.background=m==='agent'?'#2563eb':'#fff';$('btnAgent').style.color=m==='agent'?'#fff':'#333'},
+async wsConnect(){if(this.ws&&this.ws.readyState===WebSocket.OPEN)return;try{this.ws=new WebSocket('ws://'+location.host+'/ws/chat');this.ws.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch(err){return}A.swHandleWS(d)};this.ws.onclose=()=>this.ws=null}catch(e){}},
+scrollChat(){const cm=$('chatMsgs');if(cm)cm.scrollTop=cm.scrollHeight},
+addMsg(user,text){return this.addMsgEl(user,text)},
+addMsgEl(user,text){const div=document.createElement('div');div.style.cssText='display:flex;'+(user?'justify-content:flex-end':'justify-content:flex-start')+';margin:2px 0';const bubble=document.createElement('div');bubble.style.cssText='font-size:12px;padding:4px 8px;border-radius:8px;background:'+(user?'var(--bubble-user)':'var(--bubble-ai)')+';color:'+(user?'#fff':'var(--bubble-ai-fg)')+';max-width:80%;white-space:pre-wrap;word-break:break-word';if(text!=null&&text!==''){if(text.indexOf('<div class="spinner"')===0)bubble.innerHTML=text;else bubble.textContent=text}div.appendChild(bubble);$('chatMsgs').appendChild(div);this.scrollChat();return bubble},
+chatSend(){const t=$('chatMsgInput').value.trim();if(!t)return;$('chatMsgInput').value='';this.addMsg(true,t);this.swStreamBegin();if(!this.ws||this.ws.readyState!==WebSocket.OPEN){this.wsConnect();return}this.swSend({type:'message',content:t,data:{mode:this.mode}})},
+setMode(m){this.mode=m;$('btnAsk').style.background=m==='ask'?'var(--accent)':'var(--card)';$('btnAsk').style.color=m==='ask'?'#fff':'var(--fg)';$('btnAgent').style.background=m==='agent'?'var(--accent)':'var(--card)';$('btnAgent').style.color=m==='agent'?'#fff':'var(--fg)'},
 toggleChat(){const p=$('chatPanel');const hidden=p.style.display==='none';p.style.display=hidden?'':'none';$('chatArrow').textContent=hidden?'-':'+'},
 toggleSide(){const s=$('sidebar');s.style.display=s.style.display==='none'?'':'none'},
 show(id){const el=$(id);if(id==='lgPanel')el.style.display='flex';else el.style.display=''},hide(id){$(id).style.display='none'},hidePanel(){this.hide('lgPanel');if(this._logTimer)clearInterval(this._logTimer);this._logTimer=null},
+
+// ── 主题 ────────────────────────────────────────────
+swThemeInit(){let t=localStorage.getItem('sw-theme');if(!t){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'}this.swApplyTheme(t)},
+swApplyTheme(t){const dark=t==='dark';document.body.classList.toggle('dark',dark);document.documentElement.setAttribute('data-theme',dark?'dark':'light');const b=$('swThemeBtn');if(b)b.textContent=dark?'☀️':'🌙'},
+swToggleTheme(){const dark=!document.body.classList.contains('dark');localStorage.setItem('sw-theme',dark?'dark':'light');this.swApplyTheme(dark?'dark':'light')},
+
+// ── WebSocket 事件分发 ──────────────────────────────
+swSend(obj){if(this.ws&&this.ws.readyState===WebSocket.OPEN){try{this.ws.send(JSON.stringify(obj))}catch(e){}}},
+swHandleWS(d){
+const t=d&&d.type;const data=(d&&d.data)||{};
+switch(t){
+case 'llm.delta':this.swStreamAppend(data.delta||'');break;
+case 'response':this.swStreamFinal(d.content||'');this.load();break;
+case 'tool.called':this._step=this.swStepAdd(data.tool||'',data.args);break;
+case 'tool.result':if(this._step)this.swStepResult(this._step,!!data.ok,data.summary||'');this._step=null;break;
+case 'approval_required':this.swApprovalShow(data);break;
+case 'session.started':this.swStatusLine('⚙ 处理中…');break;
+case 'session.done':this.swStreamFinal(null);this.swStatusLine('✓ 完成');break;
+case 'session.error':this.swStreamFinal(null);this.swToast(data.error_code||'session.error',d.content||data.message||'会话错误','error');this.swStatusLine('✗ 会话错误');break;
+case 'progress':break;
+case 'error':this.swStreamFinal(null);this.swToast(data.error_code||'error',d.content||'服务器错误','error');break;
+default:break;
+}},
+swStreamBegin(){if(this._stream)this.swStreamFinal(null);const el=this.addMsgEl(false,'');el.innerHTML='<div class="spinner" style="margin:2px auto"></div><div style="text-align:center;font-size:11px;color:var(--muted)">Thinking...</div>';this._stream={el,acc:''}},
+swStreamAppend(delta){if(delta==null||delta==='')return;if(!this._stream)this.swStreamBegin();const s=this._stream;if(s.acc===''){s.el.textContent=''}s.acc+=delta;s.el.textContent=s.acc;this.scrollChat()},
+swStreamFinal(text){if(this._stream){this._stream.el.textContent=(text!=null&&text!=='')?text:(this._stream.acc||'');this._stream=null;this.scrollChat()}else if(text!=null&&text!==''){this.addMsg(false,text)}},
+swStatusLine(msg){const cm=$('chatMsgs');if(!cm)return;const div=document.createElement('div');div.style.cssText='text-align:center;font-size:11px;color:var(--muted);margin:2px 0';div.textContent=msg||'';cm.appendChild(div);this.scrollChat()},
+swStepAdd(tool,args){const cm=$('chatMsgs');const wrap=document.createElement('div');wrap.className='sw-step';const details=document.createElement('details');const summary=document.createElement('summary');const title=document.createElement('span');title.textContent='🔧 '+tool;const status=document.createElement('span');status.className='sw-step-status';status.innerHTML='<span class="spinner" style="width:10px;height:10px;border-width:1px"></span>';summary.appendChild(title);summary.appendChild(status);const body=document.createElement('div');body.className='sw-step-body';let argText='';try{argText=JSON.stringify(args,null,2)}catch(e){argText=String(args)}body.textContent=argText||'(无参数)';details.appendChild(summary);details.appendChild(body);wrap.appendChild(details);cm.appendChild(wrap);this.scrollChat();return{status,body}},
+swStepResult(step,ok,summary){if(!step)return;step.status.innerHTML='';step.status.textContent=ok?'✅ 完成':'⚠️ 失败';step.status.style.color=ok?'var(--ok)':'var(--danger)';if(summary){const s=document.createElement('div');s.style.cssText='margin-top:6px;color:var(--fg-soft);white-space:pre-wrap';s.textContent=summary;step.body.appendChild(s)}},
+
+// ── 审批弹窗 ────────────────────────────────────────
+swIsDangerous(tool){return /(delete|del|clear|remove|purge|batch_update)/i.test(tool||'')},
+swApprovalShow(data){
+this.swApprovalClear();
+const tool=data.tool||'tool';const args=data.args||{};const dangerous=this.swIsDangerous(tool);
+let argText='';try{argText=JSON.stringify(args,null,2)}catch(e){argText=String(args)}
+const mask=document.createElement('div');mask.className='sw-approval-mask';
+mask.innerHTML='<div class="sw-approval-card'+(dangerous?' sw-danger':'')+'">'
++'<div style="font-size:15px;font-weight:700;'+(dangerous?'color:var(--danger)':'')+'">'+(dangerous?'⚠️ 危险操作确认':'🔐 操作确认')+'</div>'
++'<div style="margin-top:6px;font-size:12px;color:var(--muted)">即将执行以下操作：</div>'
++'<div style="margin-top:6px;font-size:13px;font-weight:600">'+esc(tool)+'</div>'
++(dangerous?'<div style="margin-top:6px;font-size:12px;color:var(--danger)">此操作可能不可逆，请谨慎确认。60 秒未操作将自动拒绝。</div>':'<div style="margin-top:6px;font-size:12px;color:var(--muted)">60 秒未操作将自动拒绝。</div>')
++'<div class="sw-approval-args">'+esc(argText)+'</div>'
++'<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">'
++'<button class="btn btn-ghost btn-sm" onclick="A.swApprovalReply(false)">拒绝</button>'
++'<button class="btn btn-primary btn-sm" style="'+(dangerous?'background:var(--danger);border-color:var(--danger)':'')+'" onclick="A.swApprovalReply(true)">允许</button>'
++'</div></div>';
+document.body.appendChild(mask);
+this._approval={id:data.approval_id,mask};
+this._approvalTimer=setTimeout(()=>A.swApprovalReply(false,true),60000);
+},
+swApprovalClear(){if(this._approvalTimer){clearTimeout(this._approvalTimer);this._approvalTimer=null}if(this._approval){if(this._approval.mask&&this._approval.mask.parentNode)this._approval.mask.parentNode.removeChild(this._approval.mask);this._approval=null}},
+swApprovalReply(approved,auto){const ap=this._approval;if(!ap)return;const id=ap.id;this.swApprovalClear();this.swSend({type:'approval',data:{approval_id:id,approved:!!approved}});if(auto)this.swToast('审批超时','已自动拒绝','warn');else if(!approved)this.swToast('已拒绝','操作已取消','warn')},
+
+// ── Toast 提示条 ────────────────────────────────────
+swToast(code,message,kind){
+let box=$('swToastBox');if(!box){box=document.createElement('div');box.id='swToastBox';document.body.appendChild(box)}
+const el=document.createElement('div');
+el.style.cssText='background:var(--card);color:var(--fg);border:1px solid '+(kind==='error'?'var(--danger)':'var(--border-strong)')+';border-radius:8px;padding:8px 12px;font-size:12px;box-shadow:0 4px 16px var(--shadow);word-break:break-word';
+el.innerHTML='<b style="color:'+(kind==='error'?'var(--danger)':'var(--muted)')+'">'+esc(code||'')+'</b> <span>'+esc(message||'')+'</span>';
+box.appendChild(el);
+setTimeout(()=>{el.style.transition='opacity .4s';el.style.opacity='0';setTimeout(()=>{if(el.parentNode)el.parentNode.removeChild(el)},400)},5000);
+},
+
+// ── 上传进度面板 ────────────────────────────────────
+swUploadStatusText(s){const map={queued:'排队中',scanning:'扫描中',extracting:'提取中',linking:'链接中',processing:'处理中',done:'完成',failed:'失败',error:'失败',cancelled:'已取消'};return map[s]||s||'处理中'},
+swUploadTerminal(s){return['done','failed','error','cancelled'].indexOf(s)>=0},
+swUploadPanel(filename,taskId){
+const cancelBtn=taskId?'<button class="btn btn-ghost btn-xs" onclick="A.swUploadCancel(\''+esc(taskId)+'\')">取消</button>':'';
+const h='<div class="sw-upload">'
++'<div class="font-bold" style="font-size:15px">📄 上传任务</div>'
++'<div style="font-size:12px;color:var(--muted);margin-top:4px">'+esc(filename||'')+'</div>'
++'<div id="swUpStatus" style="margin-top:10px;font-size:13px">处理中…</div>'
++'<div style="margin-top:6px;height:8px;background:var(--card-2);border-radius:4px;overflow:hidden;border:1px solid var(--border)"><div id="swUpBar" style="height:100%;width:0%;background:var(--accent);transition:width .3s"></div></div>'
++'<div id="swUpResult" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>'
++'<div style="margin-top:10px;display:flex;gap:8px">'+cancelBtn+'</div>'
++'</div>';
+$('main').innerHTML=h;
+},
+swUploadRender(s){
+const st=$('swUpStatus'),bar=$('swUpBar'),res=$('swUpResult');
+const status=s.status||'';
+if(st)st.textContent=this.swUploadStatusText(status);
+const prog=s.progress||{};
+if(bar){if(typeof prog.current==='number'&&typeof prog.total==='number'&&prog.total>0){const pct=Math.max(0,Math.min(100,Math.round(prog.current/prog.total*100)));bar.style.width=pct+'%'}else if(status==='done'){bar.style.width='100%'}else if(status==='failed'||status==='error'||status==='cancelled'){bar.style.width='0%'}}
+const result=s.result||s;
+if(res){const imp=result.imported??0,skip=result.skipped??0,fail=result.failed??0;if(imp||skip||fail){res.textContent='导入 '+imp+' · 跳过 '+skip+' · 失败 '+fail}else if(status==='done'){res.textContent='导入完成'}else if(status==='failed'||status==='error'){res.textContent='失败: '+(s.message||'')}else if(status==='cancelled'){res.textContent='任务已取消'}}
+},
+swUploadPoll(taskId){
+this._uploadCancelled=false;
+const timer=setInterval(async()=>{
+if(A._uploadCancelled){clearInterval(timer);return}
+let s;
+try{const r=await fetch('/api/upload/status/'+taskId);const d=await r.json();if(d.status!=='success')return;s=d.data||{}}catch(e){return}
+A.swUploadRender(s);
+if(A.swUploadTerminal(s.status||'')){
+clearInterval(timer);A._uploadTimer=null;
+if(s.status==='done'){try{await fetch('/api/cards/deduplicate',{method:'POST'})}catch(e){}await A.load();const cards=(s.cards&&s.cards.length)?s.cards:null;if(cards&&cards.length)A.openCard(cards[0].id||cards[0])}
+else{await A.load()}
+const res=$('swUpResult');if(res&&!(s.status==='done'&&(s.cards||[]).length)){res.innerHTML+=' <button class="btn btn-primary btn-xs" style="margin-left:8px" onclick="A.mainClear()">返回</button>'}
+}
+},1000);
+this._uploadTimer=timer;
+},
+swUploadCancel(taskId){
+this._uploadCancelled=true;
+if(this._uploadTimer){clearInterval(this._uploadTimer);this._uploadTimer=null}
+try{fetch('/api/upload/cancel/'+taskId,{method:'POST'}).catch(()=>{})}catch(e){}
+const st=$('swUpStatus');if(st)st.textContent='已取消';
+const bar=$('swUpBar');if(bar)bar.style.width='0%';
+const res=$('swUpResult');if(res)res.innerHTML='任务已取消 <button class="btn btn-primary btn-xs" style="margin-left:8px" onclick="A.mainClear()">返回</button>';
+this.load();
+},
+
+// ── 知识图谱 ────────────────────────────────────────
+swHashColor(s){let h=0;const str=String(s||'');for(let i=0;i<str.length;i++){h=(h*31+str.charCodeAt(i))>>>0}return 'hsl('+(h%360)+',65%,55%)'},
+async swShowGraph(){
+const m=$('swGraphModal');if(!m)return;
+this.show('swGraphModal');
+const box=$('swGraphBody');const svg=$('swGraphSvg');
+svg.innerHTML='';$('swGraphNote').textContent='';
+const holder=document.createElement('div');holder.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%';holder.innerHTML='<div class="spinner"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">加载图谱…</div>';box.appendChild(holder);
+let cards;
+try{const r=await fetch('/api/cards?limit=1000');const d=await r.json();if(d.status!=='success')throw new Error(d.message||'failed');cards=d.data.cards||[]}catch(e){holder.remove();$('swGraphNote').textContent='图谱加载失败: '+e.message;return}
+holder.remove();
+const W=box.clientWidth||800,H=box.clientHeight||500;
+this.swGraphRender(cards,W,H);
+},
+swGraphRender(cards,W,H){
+const MAXN=400;const capped=cards.slice(0,MAXN);
+const nodes=capped.map(c=>({id:c.id,title:c.title,category:c.category||'未分类'}));
+const byId=new Map(nodes.map(n=>[n.id,n]));
+const edges=[];const seen=new Set();
+for(const c of capped){for(const rid of(c.related_cards||[])){if(!rid||c.id===rid||!byId.has(rid))continue;const key=c.id<rid?c.id+'|'+rid:rid+'|'+c.id;if(seen.has(key))continue;seen.add(key);edges.push({a:c.id,b:rid})}}
+const pos=this.swGraphLayout(nodes,edges,W,H);
+const svg=$('swGraphSvg');
+svg.setAttribute('viewBox','0 0 '+W+' '+H);
+let h='';
+for(const e of edges){const a=pos.get(e.a),b=pos.get(e.b);if(!a||!b)continue;h+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="var(--border-strong)" stroke-width="0.5" opacity="0.6"></line>'}
+for(const n of nodes){const p=pos.get(n.id);if(!p)continue;const c=this.swHashColor(n.category);h+='<g class="sw-gnode" data-id="'+esc(n.id)+'" transform="translate('+p.x+','+p.y+')" style="cursor:pointer" onclick="A.swGraphOpen(this)"><circle r="5" fill="'+c+'"></circle><text x="8" y="3" font-size="9" fill="var(--fg)">'+esc(n.title)+'</text></g>'}
+svg.innerHTML=h;
+this._graph={nodes,edges,pos,W,H,drag:null,wasDragged:false};
+svg.onpointerdown=e=>this.swGraphDown(e);
+svg.onpointermove=e=>this.swGraphMove(e);
+svg.onpointerup=()=>{if(this._graph)this._graph.drag=null};
+svg.onpointerleave=()=>{if(this._graph)this._graph.drag=null};
+$('swGraphNote').textContent='节点 '+nodes.length+(cards.length>MAXN?'（仅显示前 '+MAXN+' 个，共 '+cards.length+' 个）':'')+' · 边 '+edges.length+' 条 · 拖拽移动节点，点击节点打开卡片。';
+},
+swGraphLayout(nodes,edges,W,H){
+const N=nodes.length;const pos=new Map();const cx=W/2,cy=H/2,R=Math.min(W,H)*0.42;
+nodes.forEach((n,i)=>{const ang=(i/N)*2*Math.PI;pos.set(n.id,{x:cx+Math.cos(ang)*R,y:cy+Math.sin(ang)*R,vx:0,vy:0})});
+const adj=new Map();nodes.forEach(n=>adj.set(n.id,[]));
+edges.forEach(e=>{const a=adj.get(e.a),b=adj.get(e.b);if(a&&b){a.push(e.b);b.push(e.a)}});
+const k=Math.sqrt(W*H/Math.max(N,1));const REP=5000,SPRING=0.08,GRAV=0.03,DAMP=0.85;
+const arr=Array.from(pos.values());
+for(let it=0;it<300;it++){
+for(let i=0;i<N;i++){const pi=arr[i];for(let j=i+1;j<N;j++){const pj=arr[j];let dx=pi.x-pj.x,dy=pi.y-pj.y;let d2=dx*dx+dy*dy;if(d2<1)d2=1;const d=Math.sqrt(d2);const f=REP/d2;const fx=dx/d*f,fy=dy/d*f;pi.vx+=fx;pi.vy+=fy;pj.vx-=fx;pj.vy-=fy}}
+edges.forEach(e=>{const a=pos.get(e.a),b=pos.get(e.b);if(!a||!b)return;const dx=b.x-a.x,dy=b.y-a.y;const d=Math.max(Math.sqrt(dx*dx+dy*dy),0.01);const f=SPRING*(d-k);const fx=dx/d*f,fy=dy/d*f;a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy});
+arr.forEach(p=>{p.vx+=(cx-p.x)*GRAV;p.vy+=(cy-p.y)*GRAV;p.vx*=DAMP;p.vy*=DAMP;p.x+=p.vx;p.y+=p.vy;p.x=Math.max(6,Math.min(W-6,p.x));p.y=Math.max(6,Math.min(H-6,p.y))});
+}
+return pos;
+},
+swGraphDown(e){const t=e.target;if(t&&t.tagName&&t.tagName.toLowerCase()==='circle'&&this._graph){const g=t.parentNode;const id=g&&g.getAttribute?g.getAttribute('data-id'):null;if(id){this._graph.drag={id};this._graph.wasDragged=false;try{$('swGraphSvg').setPointerCapture(e.pointerId)}catch(err){}}}},
+swGraphMove(e){const g=this._graph;if(!g||!g.drag)return;const svg=$('swGraphSvg');const p=g.pos.get(g.drag.id);if(!p)return;let x,y;try{const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const ctm=svg.getScreenCTM();if(!ctm)return;const sp=pt.matrixTransform(ctm.inverse());x=sp.x;y=sp.y}catch(err){return}p.x=Math.max(6,Math.min(g.W-6,x));p.y=Math.max(6,Math.min(g.H-6,y));g.wasDragged=true;const el=svg.querySelector('.sw-gnode[data-id="'+g.drag.id+'"]');if(el)el.setAttribute('transform','translate('+p.x+','+p.y+')')},
+swGraphOpen(el){const id=el&&el.getAttribute?el.getAttribute('data-id'):null;if(this._graph&&this._graph.wasDragged){this._graph.wasDragged=false;return}this.hide('swGraphModal');if(id)this.openCard(id)},
 };
+(function swFetchWrap(){
+if(window.__swFetchWrapped)return;window.__swFetchWrapped=true;
+const orig=window.fetch;
+window.fetch=function(...args){
+const p=orig.apply(this,args);
+p.then(res=>{
+try{
+const url=String(args[0]);
+if(url.indexOf('/api/upload/cancel/')>=0)return;
+const ct=res.headers.get('content-type')||'';
+if(ct.indexOf('application/json')>=0){res.clone().json().then(d=>{if(d&&d.error_code){A.swToast(d.error_code,d.message||'','error')}}).catch(()=>{})}
+}catch(e){}
+}).catch(()=>{});
+return p;
+};
+})();
+A.swThemeInit();
 A.init();
 </script>
 </body>

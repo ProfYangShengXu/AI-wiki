@@ -2,13 +2,13 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from bobanana.database import db_manager
 from bobanana.config import CHROMA_COLLECTION_NAME
+from bobanana.database import db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ _kb_meta: dict[str, dict] = {
     CHROMA_COLLECTION_NAME: {
         "id": CHROMA_COLLECTION_NAME,
         "name": "默认知识库",
-        "created": datetime.now(timezone.utc).isoformat(),
+        "created": datetime.now(UTC).isoformat(),
         "card_count": 0,
     }
 }
@@ -54,7 +54,10 @@ async def list_kbs():
 @router.post("/create")
 async def create_kb(data: KBCreate):
     kb_id = uuid.uuid4().hex[:12]
-    _kb_meta[kb_id] = {"id": kb_id, "name": data.name, "created": datetime.now(timezone.utc).isoformat(), "card_count": 0}
+    _kb_meta[kb_id] = {
+        "id": kb_id, "name": data.name,
+        "created": datetime.now(UTC).isoformat(), "card_count": 0,
+    }
     try:
         _ensure_collection("kb_" + kb_id)
     except Exception:
@@ -69,9 +72,10 @@ async def switch_kb(kb_id: str):
         raise HTTPException(404, "知识库不存在")
     col_name = CHROMA_COLLECTION_NAME if kb_id == CHROMA_COLLECTION_NAME else "kb_" + kb_id
     try:
-        db_manager._collection = _ensure_collection(col_name)
+        col = _ensure_collection(col_name)
+        db_manager.switch_collection(col)
     except Exception as e:
-        raise HTTPException(500, f"切换失败: {e}")
+        raise HTTPException(500, f"切换失败: {e}") from None
     _current_kb = kb_id
     count = db_manager.count()
     _kb_meta[kb_id]["card_count"] = count
@@ -92,7 +96,7 @@ async def delete_kb(kb_id: str):
     del _kb_meta[kb_id]
     if _current_kb == kb_id:
         col = _ensure_collection(CHROMA_COLLECTION_NAME)
-        db_manager._collection = col
+        db_manager.switch_collection(col)
         _current_kb = CHROMA_COLLECTION_NAME
     return {"status": "success", "message": "已删除"}
 
