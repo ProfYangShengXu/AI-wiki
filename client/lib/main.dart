@@ -11,12 +11,18 @@ import 'services/tray_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Windows: 自动拉起本地后端 sidecar(微信/QQ 形态:双击客户端即可用),
-  // 并初始化系统托盘。非 Windows 平台为 no-op。
-  if (Platform.isWindows) {
-    unawaited(SidecarService.instance.ensureBackendRunning());
-    await TrayService.instance.init();
-  }
-
+  // 先启动 UI(绝不阻塞);首帧后再异步初始化 Windows sidecar 与托盘,
+  // 避免在消息循环启动前调用原生托盘接口导致白屏不响应。
   runApp(const ProviderScope(child: StudyWikiApp()));
+
+  if (Platform.isWindows) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(SidecarService.instance.ensureBackendRunning());
+      unawaited(
+        TrayService.instance
+            .init()
+            .timeout(const Duration(seconds: 15), onTimeout: () {}),
+      );
+    });
+  }
 }

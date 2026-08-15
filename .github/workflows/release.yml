@@ -99,9 +99,69 @@ jobs:
           name: client-apk
           path: client/studywiki-client-debug.apk
 
+  build-installer:
+    name: build-installer (一键安装包)
+    runs-on: windows-latest
+    needs: [build-backend, build-client-windows]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 下载后端与客户端产物
+        uses: actions/download-artifact@v4
+        with:
+          path: stage
+      - name: 组装安装目录
+        shell: pwsh
+        run: |
+          Expand-Archive -Path stage/client-windows/client-windows.zip -DestinationPath stage/client
+          New-Item -ItemType Directory -Force -Path stage/client | Out-Null
+          Copy-Item stage/backend-exe/study-wiki-core.exe stage/study-wiki-core.exe
+      - name: 安装 Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: 生成安装脚本
+        shell: pwsh
+        run: |
+          @'
+          [Setup]
+          AppName=StudyWiki-Agent
+          AppVersion=0.6.0
+          DefaultDirName={autopf}\StudyWiki-Agent
+          DefaultGroupName=StudyWiki-Agent
+          OutputDir=dist
+          OutputBaseFilename=studywiki-setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          PrivilegesRequired=lowest
+          WizardStyle=modern
+          UninstallDisplayIcon={app}\client\studywiki_client.exe
+
+          [Files]
+          Source: "stage\client\*"; DestDir: "{app}\client"; Flags: recursesubdirs ignoreversion
+          Source: "stage\study-wiki-core.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+          [Icons]
+          Name: "{autoprograms}\StudyWiki-Agent"; Filename: "{app}\client\studywiki_client.exe"
+          Name: "{autodesktop}\StudyWiki-Agent"; Filename: "{app}\client\studywiki_client.exe"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务:"
+
+          [Run]
+          Filename: "{app}\client\studywiki_client.exe"; Description: "立即启动 StudyWiki-Agent"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content -Encoding UTF8 installer.iss
+      - name: 编译安装包
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/studywiki-setup.exe
+
   publish:
     name: publish gray release
-    needs: [build-backend, build-client-windows, build-client-apk]
+    needs: [build-backend, build-client-windows, build-client-apk, build-installer]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -128,15 +188,17 @@ jobs:
             artifacts/backend-exe/study-wiki-core.exe
             artifacts/client-windows/client-windows.zip
             artifacts/client-apk/studywiki-client-debug.apk
+            artifacts/installer/studywiki-setup.exe
           body: |
             ## 灰测说明
             本版本为灰度测试版(pre-release),请按 `docs/gray-test-checklist.md` 执行测试并反馈。
 
-            ### 安装
-            - Windows: 解压 `client-windows.zip`,双击 `studywiki_client.exe` 即可——客户端会自动拉起内置的 `study-wiki-core.exe`(托盘常驻,关闭窗口最小化到托盘)
+            ### 安装(推荐)
+            - Windows: 下载 **`studywiki-setup.exe`** 一键安装(前后端一起装好,桌面/开始菜单快捷方式,双击即用)
+            - 免安装版: 解压 `client-windows.zip` 双击 `studywiki_client.exe`(自动拉起内置后端,托盘常驻)
             - Android: 安装 `studywiki-client-debug.apk`(允许未知来源)
 
             ### 已知注意事项
-            - 首次启动需配置 DeepSeek API Key(灰屏引导)
-            - Windows 智能屏未签名,可能出现 SmartScreen 提示,选择"仍要运行"
+            - 首次启动需配置 DeepSeek API Key(灰屏引导;后端冷启动约 10-20s,界面会自动重试等待)
+            - 安装包未签名,可能出现 SmartScreen 提示,选择"仍要运行"
             - 问题反馈: https://github.com/ProfYangShengXu/AI-wiki/issues
