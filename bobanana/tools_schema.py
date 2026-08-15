@@ -1,12 +1,14 @@
 """执行层工具 — 所有功能定义 JSON Schema + 执行函数。"""
 
 import json as _json
-import re
 import logging
-from typing import Optional
+import re
+import typing
 
-from bobanana.service.card_service import card_service
+from pydantic import Field, create_model
+
 from bobanana.models import CardCreate, CardUpdate
+from bobanana.service.card_service import card_service
 from bobanana.tools import llm_invoke, web_search
 
 logger = logging.getLogger(__name__)
@@ -15,7 +17,7 @@ logger = logging.getLogger(__name__)
 # 工具 Schema 定义 (Function Calling 格式)
 # ═══════════════════════════════════════════════════════════
 
-TOOLS = [
+TOOLS: list[dict] = [
     {
         "name": "search_knowledge",
         "description": "搜索知识库，根据关键词查找相关的知识卡片。返回卡片标题、内容和来源出处。",
@@ -59,7 +61,7 @@ TOOLS = [
     },
     {
         "name": "update_card",
-        "description": "修改已有知识卡片的内容、标题或分类。",
+        "description": "修改已有知识卡片的内容、标题、分类、别名或案例。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -67,6 +69,7 @@ TOOLS = [
                 "title": {"type": "string", "description": "新标题"},
                 "content": {"type": "string", "description": "新内容"},
                 "category": {"type": "string", "description": "新分类"},
+                "aliases": {"type": "array", "items": {"type": "string"}, "description": "新别名列表"},
                 "examples": {"type": "array", "items": {"type": "string"}, "description": "新案例列表"}
             },
             "required": ["card_id_or_title"]
@@ -75,6 +78,7 @@ TOOLS = [
     {
         "name": "delete_card",
         "description": "删除一张知识卡片。",
+        "approval_required": True,
         "parameters": {
             "type": "object",
             "properties": {
@@ -125,7 +129,8 @@ TOOLS = [
         "parameters": {
             "type": "object",
             "properties": {
-                "category_names": {"type": "array", "items": {"type": "string"}, "description": "要组卷的分类名称列表"},
+                "category_names": {"type": "array", "items": {"type": "string"},
+                                 "description": "要组卷的分类名称列表"},
                 "topic": {"type": "string", "description": "考试主题（可选）"}
             },
             "required": ["category_names"]
@@ -186,6 +191,23 @@ def execute_tool(tool_name: str, params: dict) -> dict:
         if tool_name == "search_knowledge":
             return _search_knowledge(params["query"])
 
+        elif tool_name == "upload_document":
+            from pathlib import Path
+            file_path = str(params.get("file_path") or "")
+            p = Path(file_path)
+            if not p.is_file():
+                return {"error": f"文件不存在: {file_path}"}
+            from bobanana.agent import run_import_workflow
+            result = run_import_workflow(file_path, p.name)
+            return {
+                "status": "imported",
+                "file": p.name,
+                "imported": len(result.success),
+                "failed": len(result.failed),
+                "cards": [c.title for c in result.success],
+                "errors": [f.get("reason") for f in result.failed],
+            }
+
         elif tool_name == "list_categories":
             cats = card_service.get_categories_sync()
             return {"categories": cats, "count": len(cats)}
@@ -207,26 +229,32 @@ def execute_tool(tool_name: str, params: dict) -> dict:
                     prompt = f"""为知识点生成完整卡片 JSON:
 标题: {title}
 分类: {category}
-返回: {{"title","aliases","content(400-600字含比喻+关联)","examples":["string"],"questions":["string"],"category":"{category}"}}"""
+返回: {{"title","aliases","content(400-600字含比喻+关联)",
+"examples":["string"],"questions":["string"],"category":"{category}"}}"""
                     raw = llm_invoke("只返回 JSON。", prompt, timeout_sec=30)
                     parsed = _clean_json(raw)
                     if parsed and isinstance(parsed, dict) and "error" not in parsed:
                         content = parsed.get("content", "")
                         llm_examples = parsed.get("examples", [])
                         if not examples and llm_examples:
-                            examples = [str(e) if isinstance(e, str) else str(e.get(list(e.keys())[0], e)) if isinstance(e, dict) else str(e) for e in llm_examples]
+                            examples = [
+                                str(e) if isinstance(e, str)
+                                else str(e.get(list(e.keys())[0], e)) if isinstance(e, dict)
+                                else str(e)
+                                for e in llm_examples
+                            ]
                 except Exception as e:
                     logger.warning("LLM auto-fill failed: %s", e)
 
             # 确保 examples 是字符串列表
             safe_examples = []
-            for e in (examples or []):
-                if isinstance(e, str):
-                    safe_examples.append(e)
-                elif isinstance(e, dict):
-                    safe_examples.append(str(e.get(list(e.keys())[0], e)))
+            for example in (examples or []):
+                if isinstance(example, str):
+                    safe_examples.append(example)
+                elif isinstance(example, dict):
+                    safe_examples.append(str(example.get(list(example.keys())[0], example)))
                 else:
-                    safe_examples.append(str(e))
+                    safe_examples.append(str(example))
 
             card = card_service.create_card_sync(CardCreate(
                 title=title, category=category, content=content or "",
@@ -239,7 +267,7 @@ def execute_tool(tool_name: str, params: dict) -> dict:
             if not card:
                 return {"error": f"未找到卡片: {params['card_id_or_title']}"}
             update = {}
-            for f in ["title", "content", "category", "examples"]:
+            for f in ["title", "content", "category", "aliases", "examples"]:
                 if f in params and params[f] is not None:
                     update[f] = params[f]
             card = card_service.update_card_sync(card.id, CardUpdate(**update))
@@ -281,6 +309,7 @@ def execute_tool(tool_name: str, params: dict) -> dict:
             m["attempts"] += 1
             total = sum(r.get("score", 5) for r in results) if results else 0
             m["score"] = max(m["score"], total)
+            m["max_score"] = max(int(m.get("max_score") or 0), len(results) * 10)
             return {"results": results, "total": total, "max_score": len(results)*10}
 
         elif tool_name == "create_exam":
@@ -303,8 +332,8 @@ def execute_tool(tool_name: str, params: dict) -> dict:
             if not card: return {"error": "未找到卡片"}
             from bobanana.routes.quiz import _mastery
             m = _mastery.get(card.id, {"attempts": 0, "score": 0})
-            total = max(m["attempts"] * 10, 1)
-            pct = min(round(m["score"] / total * 100), 100)
+            from bobanana.routes.quiz import _mastery_percent
+            pct = _mastery_percent(m)
             return {"card_title": card.title, "mastery_pct": pct, "attempts": m["attempts"]}
 
         elif tool_name == "web_search_enrich":
@@ -321,7 +350,7 @@ def execute_tool(tool_name: str, params: dict) -> dict:
 
 # ── 辅助函数 ──────────────────────────────────────────
 
-def _clean_json(raw: str) -> Optional[dict]:
+def _clean_json(raw: str) -> dict | None:
     clean = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
     m = re.search(r"(\{.*\})", clean, re.DOTALL)
     if m: clean = m.group(1)
@@ -337,3 +366,77 @@ def _parse_json_array(raw: str) -> list:
         result = _json.loads(clean)
         return result if isinstance(result, list) else [result]
     except Exception: return []
+
+
+# ═══════════════════════════════════════════════════════════
+# 工具参数 Pydantic 模型 (Phase 2: 结构化校验)
+# ═══════════════════════════════════════════════════════════
+
+def _schema_type_to_py(prop: dict) -> typing.Any:
+    """将 JSON Schema 的 type 映射为 Python 类型。"""
+    t = prop.get("type", "string")
+    if t == "string":
+        return str
+    if t == "integer":
+        return int
+    if t == "number":
+        return float
+    if t == "boolean":
+        return bool
+    if t == "array":
+        items = prop.get("items") or {}
+        return list[_schema_type_to_py(items)]  # type: ignore[misc]  # 运行时动态构造 List[元素类型]
+    if t == "object":
+        return dict
+    return typing.Any
+
+
+def _build_model_for_tool(tool: dict):
+    """根据工具 JSON Schema 生成 Pydantic 模型。"""
+    params = tool.get("parameters") or {}
+    properties = params.get("properties") or {}
+    required = set(params.get("required") or [])
+
+    fields = {}
+    for name, prop in properties.items():
+        py_type = _schema_type_to_py(prop)
+        description = prop.get("description", "")
+        if name in required:
+            fields[name] = (py_type, Field(..., description=description))
+        else:
+            default = prop.get("default", None)
+            fields[name] = (py_type, Field(default=default, description=description))
+
+    model_name = "Tool_" + tool["name"]
+    return create_model(model_name, **fields)
+
+
+# 工具名 → Pydantic 模型
+TOOL_PYDANTIC_MODELS: dict[str, type] = {
+    t["name"]: _build_model_for_tool(t) for t in TOOLS
+}
+
+
+def validate_tool_args(tool_name: str, params) -> tuple:
+    """校验工具参数, 返回 (ok, model|error)。
+
+    - ok=True 时返回 (True, Pydantic 模型实例);
+    - ok=False 时返回 (False, 错误信息字符串)。
+    """
+    model = TOOL_PYDANTIC_MODELS.get(tool_name)
+    if model is None:
+        return False, f"未知工具: {tool_name}"
+    try:
+        data = params if isinstance(params, dict) else {}
+        validated = model(**data)
+        return True, validated
+    except Exception as e:
+        return False, str(e)
+
+
+def tool_requires_approval(tool_name: str) -> bool:
+    """判断工具是否需要审批。"""
+    for t in TOOLS:
+        if t["name"] == tool_name:
+            return bool(t.get("approval_required", False))
+    return False

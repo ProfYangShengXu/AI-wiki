@@ -363,6 +363,162 @@ static/
 | 用户通过 REST 删除卡片，Agent 正引用它 | Agent 回答提到已删除卡片 | Agent 在 `qa_search` 节点先查 ChromaDB，查不到则回应"该卡片已被删除" |
 | 前端 ChatPanel 引用旧卡片数据 | 显示过期信息 | ChatPanel 收到 `card:updated` 事件后，检查当前对话中是否引用了该卡片，若有则追加一条"卡片 [标题] 已被修改"的系统消息 |
 
+### 5.5 首次进入灰屏强制配置 API Key（新增）
+
+#### 5.5.1 需求
+
+用户第一次打开 StudyWiki-Agent 时，如果尚未配置可用的大模型 API Key，前端必须进入**全屏灰屏引导页**。灰屏期间：
+
+- 主界面内容被遮罩覆盖，并做 `blur(8px) + grayscale(0.9)` 处理，视觉上明确“系统未就绪”；
+- 用户只能配置 API Key，**不能关闭、跳过或进入主界面**；
+- 只有后端验证 Key 有效并成功保存后，灰屏才消失并进入正常工作台。
+
+#### 5.5.2 触发条件
+
+后端启动后通过 `GET /api/bootstrap/status` 返回配置状态。满足任一条件即触发灰屏：
+
+| 条件 | 判定逻辑 |
+| --- | --- |
+| 首次运行 | 根目录 `.env` 不存在，或 `.env` 中没有 `STUDYWIKI_BOOTSTRAPPED=1` |
+| 无可用云端 Key | `DEEPSEEK_API_KEY` 与 `OPENAI_API_KEY` 均为空或占位值（如 `your-api-key-here`） |
+| Key 被删除/失效标记 | 上次保存的 Key 被清空，或 `STUDYWIKI_BOOTSTRAPPED` 被移除 |
+
+> 首次进入**不提供 Ollama 跳过通道**。Ollama 属于已配置用户的高级本地模式，不允许绕过首次 API Key 配置。
+
+#### 5.5.3 灰屏 UI 结构
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│  主界面（被遮罩层覆盖，blur + grayscale，不可交互）          │
+│┌────────────────────────────────────────────────────────┐│
+││                    灰屏引导层                           ││
+││                                                        ││
+││        🍌 StudyWiki-Agent 首次配置                      ││
+││        配置大模型 API Key 后才能开始使用                 ││
+││                                                        ││
+││        Provider:  [ DeepSeek ▼ ]                       ││
+││        API Key:   [ sk-••••••••••••••••        👁 ]    ││
+││        Base URL:  [ https://api.deepseek.com ]         ││
+││                                                        ││
+││        [ 测试连接 ]   [ 保存并进入 ]  (不可用状态灰显)     ││
+││                                                        ││
+││        状态区: 正在验证 Key ... / Key 无效 / 网络超时      ││
+│└────────────────────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────┘
+```
+
+组件规则：
+
+- 灰屏为 `position: fixed; inset: 0; z-index: 1000`，Windows/Web/Android 共用同一视觉规范；
+- 表单在 Key 为空时不显示“保存并进入”按钮，或按钮置灰；
+- “测试连接”按钮只做验证，不保存；“保存并进入”先验证，失败则留在灰屏；
+- 所有错误信息可读，例如 `401 Key 无效`、`网络不可达`、`429 额度不足`，不允许只显示“失败”；
+- 验证期间按钮进入 loading，禁止重复提交。
+
+#### 5.5.4 前端状态机
+
+```text
+bootstrap_required
+      │  输入 provider + api_key
+      ▼
+validating ──超时/网络错误──► validation_failed ──重新输入──┐
+      │                                                     │
+      │ 200 ok                                              │
+      ▼                                                     │
+configured ─────────────────────────────────────────────────┘
+      │
+      ▼
+进入主界面（重新拉取配置、初始化侧边栏与 WebSocket）
+```
+
+前端全局状态新增：
+
+```js
+Alpine.store('app', {
+    bootstrap: {
+        required: false,   // 是否需要灰屏
+        provider: 'deepseek',
+        apiKey: '',
+        baseUrl: '',
+        status: 'idle',    // idle | validating | failed | configured
+        error: null,
+        keyTail: '',       // 只保存后端返回的掩码尾部，如 sk-...abcd
+    }
+})
+```
+
+#### 5.5.5 后端 API 设计
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/bootstrap/status` | 返回 `{required, provider, has_key, key_tail, base_url}`；永不返回完整 Key |
+| `POST` | `/api/bootstrap/test` | 用请求体中的 Key 调用供应商轻量接口验证；不落盘、不写 `.env` |
+| `POST` | `/api/bootstrap/configure` | 验证成功后才写入 `.env` 并设置 `STUDYWIKI_BOOTSTRAPPED=1` |
+
+`POST /api/bootstrap/test` 请求体：
+
+```json
+{
+  "provider": "deepseek",
+  "api_key": "sk-...",
+  "base_url": "https://api.deepseek.com"
+}
+```
+
+响应：
+
+```json
+{
+  "ok": true,
+  "message": "连接成功",
+  "provider": "deepseek",
+  "key_tail": "sk-...abcd"
+}
+```
+
+失败响应：
+
+```json
+{
+  "ok": false,
+  "error_code": "SW-BOOTSTRAP-401",
+  "message": "API Key 无效，请检查后重试"
+}
+```
+
+验证策略：
+
+1. 优先使用供应商的模型列表接口（如 OpenAI 兼容 `/models`）；
+2. 若供应商不支持模型列表，则发送 1 次最小聊天请求（`max_tokens=1`，超时 10 秒）；
+3. 验证使用的 Key 只存在于本次请求内存，不写入日志、不进入 `ApiResponse.data`；
+4. 只有 `configure` 接口在验证成功后才会写 `.env`，并按 Key 尾号掩码写日志。
+
+#### 5.5.6 安全要求
+
+- `GET /api/bootstrap/status` 返回 `key_tail`，例如 `sk-...abcd`，绝不返回 `DEEPSEEK_API_KEY` 明文；
+- `.env` 写入使用 `KEY="value"` 格式，避免 `#`、空格导致解析错误；
+- 日志脱敏：任何日志中出现 Key 只记录 `sk-***abcd`；
+- 灰屏页面不缓存用户 Key；刷新页面后需要重新读取 `.env`，已配置则直接跳过灰屏；
+- 后端重启不要求重新配置；只有 `.env` 被删除或 Key 被清空时才再次灰屏。
+
+#### 5.5.7 与各端关系
+
+| 端 | 行为 |
+| --- | --- |
+| Web（现有兼容入口） | 首次加载执行 bootstrap 检查，灰屏覆盖主界面 |
+| Windows 客户端 | 首次启动后先启动 sidecar，再渲染灰屏；配置成功后自动进入工作台 |
+| Android 客户端 | 首次配对 Windows 服务时，如果服务未配置 Key，同样显示灰屏引导页 |
+
+#### 5.5.8 测试验收
+
+- [ ] 无 `.env` 时，前端无法关闭灰屏、无法操作主界面。
+- [ ] 输入错误 Key，点击保存后仍停留在灰屏，并显示明确错误码。
+- [ ] 输入有效 Key，保存后进入主界面；刷新页面不再出现灰屏。
+- [ ] `.env` 删除后重启，灰屏重新出现。
+- [ ] `/api/bootstrap/status` 响应与日志中不存在完整 Key。
+- [ ] 灰屏在 Android/Windows/Web 三端 E2E 中均有自动化用例。
+
+
 ---
 
 ## 6. CardService 层：写入隔离设计

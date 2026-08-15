@@ -1,17 +1,60 @@
 import os
+
 """Agent 工具集 — 文档解析、网络搜索、嵌入模型、文本分块。"""
 
+import concurrent.futures
 import logging
-import threading
 import re
+import threading
+import time
 from pathlib import Path
+
 from bobanana.config import (
     EMBEDDING_PROVIDER,
-    SENTENCE_TRANSFORMERS_MODEL,
     OPENAI_EMBEDDING_MODEL,
+    SENTENCE_TRANSFORMERS_MODEL,
 )
 
 logger = logging.getLogger(__name__)
+
+# LLM 懒加载缓存（P0 修复：避免 get_llm 首次调用时 NameError）
+_llm = None
+_llm_cache: dict = {}              # provider -> LLM 实例(可能为 None)
+_provider_circuit: dict = {}       # provider -> 冷却截止 monotonic 时间戳
+_provider_circuit_lock = threading.Lock()
+_PROVIDER_COOLDOWN_SEC = 60.0
+_llm_executor = None
+_llm_executor_lock = threading.Lock()
+class _ExecutorProxy:
+    """共享线程池代理：submit 转发给真实池，shutdown 为空操作，避免误关共享池。"""
+
+    def __init__(self, executor: concurrent.futures.ThreadPoolExecutor):
+        self._executor = executor
+
+    def submit(self, *args, **kwargs):
+        return self._executor.submit(*args, **kwargs)
+
+    def shutdown(self, *args, **kwargs):
+        return None
+
+
+def _get_llm_executor() -> _ExecutorProxy:
+    """复用全局线程池，避免每次 LLM 调用都创建/销毁 executor。"""
+    global _llm_executor
+    if _llm_executor is None:
+        with _llm_executor_lock:
+            if _llm_executor is None:
+                _llm_executor = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="study-wiki-llm"
+                )
+    return _ExecutorProxy(_llm_executor)
+def reset_llm_cache() -> None:
+    """清空 LLM 实例缓存与熔断状态，配置变更后调用。"""
+    global _llm
+    _llm = None
+    _llm_cache.clear()
+    with _provider_circuit_lock:
+        _provider_circuit.clear()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -20,7 +63,6 @@ logger = logging.getLogger(__name__)
 
 _embedding_model = None
 _embedding_lock = threading.Lock()
-
 
 def get_embedding_model():
     # Force offline mode for HuggingFace (use local cache only)
@@ -47,13 +89,13 @@ def get_embedding_model():
 
     return _embedding_model
 
-
 def embed_text(text: str) -> list[float]:
     """将文本转为向量。"""
     model = get_embedding_model()
 
     if model == "openai":
         from langchain_openai import OpenAIEmbeddings
+
         from bobanana.config import OPENAI_API_KEY
         emb = OpenAIEmbeddings(
             model=OPENAI_EMBEDDING_MODEL,
@@ -65,12 +107,11 @@ def embed_text(text: str) -> list[float]:
         vector = model.encode(text, normalize_embeddings=True).tolist()
         return vector
 
-
 # ═══════════════════════════════════════════════════════════
 # 2. 文档解析
 # ═══════════════════════════════════════════════════════════
 
-def parse_document(file_path: str) -> list[dict]:
+def parse_document(file_path: str, progress_callback=None) -> list[dict]:
     """解析文档，返回 [{page_num, text}, ...] 列表。"""
     path = Path(file_path)
     ext = path.suffix.lower()
@@ -78,7 +119,7 @@ def parse_document(file_path: str) -> list[dict]:
     logger.info("解析文档: %s", file_path)
 
     if ext == ".pdf":
-        return _parse_pdf(file_path)
+        return _parse_pdf(file_path, progress_callback)
     elif ext in (".docx", ".doc"):
         return _parse_docx(file_path)
     elif ext == ".md":
@@ -88,11 +129,12 @@ def parse_document(file_path: str) -> list[dict]:
     else:
         raise ValueError(f"不支持的文件类型: {ext}")
 
-
-def _parse_pdf(file_path: str) -> list[dict]:
+def _parse_pdf(file_path: str, progress_callback=None) -> list[dict]:
     """解析 PDF — 逐页提取文本，文本少于 20 字时尝试 OCR。单页超时 30s。"""
-    import fitz, concurrent.futures
-    pages = []
+    import concurrent.futures
+
+    import fitz
+    pages: list[dict] = []
     try:
         doc = fitz.open(file_path)
     except Exception as e:
@@ -107,44 +149,64 @@ def _parse_pdf(file_path: str) -> list[dict]:
             return [{"page_num": 1, "text": ""}]
     total = len(doc)
     logger.info("PDF 共 %d 页", total)
-    for page_num in range(total):
-        try:
-            page = doc[page_num]
-            with concurrent.futures.ThreadPoolExecutor(1) as pool:
-                f = pool.submit(lambda p=page: p.get_text().strip())
+    import threading
+    result = {"pages": pages, "done": False}
+    def _parse_all():
+        for page_num in range(total):
+            if result["done"]:
+                break
+            try:
+                page = doc[page_num]
+                with concurrent.futures.ThreadPoolExecutor(1) as pool:
+                    f = pool.submit(page.get_text)
+                    try:
+                        text = f.result(timeout=30).strip()
+                    except concurrent.futures.TimeoutError:
+                        logger.warning("第 %d 页解析超时", page_num + 1)
+                        text = ""
+                if len(text) < 20:
+                    ocr_text = _ocr_page(page)
+                    if ocr_text and len(ocr_text) > len(text):
+                        text = ocr_text
+                # 跳过完全空页（OCR 后仍为空）
+                if text.strip():
+                    pages.append({"page_num": page_num + 1, "text": text})
+            except Exception as e:
+                logger.warning("第 %d 页异常: %s", page_num + 1, e)
+                # 异常时跳过该页
+            if progress_callback and (page_num + 1) % 5 == 0:
                 try:
-                    text = f.result(timeout=30)
-                except concurrent.futures.TimeoutError:
-                    logger.warning("第 %d 页解析超时", page_num + 1)
-                    text = ""
-            if len(text) < 20:
-                ocr_text = _ocr_page(page)
-                if ocr_text and len(ocr_text) > len(text):
-                    text = ocr_text
-            pages.append({"page_num": page_num + 1, "text": text})
-        except Exception as e:
-            logger.warning("第 %d 页异常: %s", page_num + 1, e)
-            pages.append({"page_num": page_num + 1, "text": ""})
-        if (page_num + 1) % 20 == 0:
-            logger.info("解析进度: %d/%d 页", page_num + 1, total)
-    doc.close()
-    logger.info("PDF 解析完成: %d 页", len(pages))
-    return pages
+                    progress_callback({"stage": "parse", "current": page_num + 1, "total": total})
+                except Exception:
+                    pass
+        doc.close()
+        result["done"] = True
 
+    # 整个 PDF 解析总超时 300s
+    t = threading.Thread(target=_parse_all, daemon=True)
+    t.start()
+    t.join(timeout=300)
+    result["done"] = True
+    if t.is_alive():
+        logger.error("PDF 解析总超时 (300s): %s", file_path)
+    logger.info("PDF 解析完成: %d 页 (总 %d 页)", len(pages), total)
+    return pages
 
 def _ocr_page(page) -> str:
     """对 PyMuPDF 页面做 OCR。失败时返回空字符串。"""
     try:
-        import pytesseract
         # 设置 tesseract 路径（不在 PATH 时的 fallback）
         import os as _os
+
+        import pytesseract
         for _p in [r'C:\Program Files\Tesseract-OCR\tesseract.exe',
                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe']:
             if _os.path.exists(_p):
                 pytesseract.pytesseract.tesseract_cmd = _p
                 break
-        from PIL import Image
         import io
+
+        from PIL import Image
         pix = page.get_pixmap(dpi=300)
         img = Image.open(io.BytesIO(pix.tobytes("png")))
         text = pytesseract.image_to_string(img, lang="chi_sim+eng").strip()
@@ -154,13 +216,12 @@ def _ocr_page(page) -> str:
         logger.debug("OCR 失败 (页 %d): %s", page.number + 1, e)
     return ""
 
-
 def _parse_docx(file_path: str) -> list[dict]:
     """解析 Word — 按段落分页。"""
     from docx import Document
     pages = []
     doc = Document(file_path)
-    current_text = []
+    current_text: list[str] = []
     page_num = 1
 
     for para in doc.paragraphs:
@@ -187,11 +248,10 @@ def _parse_docx(file_path: str) -> list[dict]:
     logger.info("Word 解析完成: %d 页", len(pages))
     return pages
 
-
 def _parse_markdown(file_path: str) -> list[dict]:
     """解析 Markdown — 按标题分节。"""
     import markdown as md_lib
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         raw = f.read()
 
     # 按 ## 标题分割
@@ -209,10 +269,9 @@ def _parse_markdown(file_path: str) -> list[dict]:
     logger.info("Markdown 解析完成: %d 节", len(pages))
     return pages
 
-
 def _parse_text(file_path: str) -> list[dict]:
     """解析纯文本 — 按空行分块。"""
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         text = f.read()
 
     blocks = re.split(r"\n\s*\n", text)
@@ -227,13 +286,14 @@ def _parse_text(file_path: str) -> list[dict]:
     logger.info("文本解析完成: %d 块", len(pages))
     return pages
 
-
 # ═══════════════════════════════════════════════════════════
 # 3. 文本分块
 # ═══════════════════════════════════════════════════════════
 
-def chunk_text(text: str, max_chars: int = 2000, overlap: int = 100) -> list[str]:
-    """将长文本分块，避免超出 LLM 上下文窗口。"""
+def chunk_text(text: str, max_chars: int = 500, overlap: int = 0) -> list[str]:
+    """将长文本按最大字符数分块，可配置重叠字符数。"""
+    if not text:
+        return [""] if text == "" else []
     if len(text) <= max_chars:
         return [text]
 
@@ -244,25 +304,22 @@ def chunk_text(text: str, max_chars: int = 2000, overlap: int = 100) -> list[str
         if end >= len(text):
             chunks.append(text[start:])
             break
-
-        # 在边界处寻找最近的换行符
-        newline_pos = text.rfind("\n", start, end)
-        if newline_pos > start + max_chars // 2:
-            end = newline_pos
+        # 尽量在段落或句子边界处切断
+        cut = text.rfind("\n\n", start, end)
+        if cut <= start:
+            cut = text.rfind("\n", start, end)
+        if cut <= start:
+            cut = text.rfind(". ", start, end)
+        if cut <= start:
+            cut = text.rfind(" ", start, end)
+        if cut <= start:
+            cut = end
         else:
-            space_pos = text.rfind(" ", start, end)
-            if space_pos > start + max_chars // 2:
-                end = space_pos
-
-        chunks.append(text[start:end])
-        start = end - overlap
-
+            cut += 1  # 包含分隔符
+        chunks.append(text[start:cut])
+        start = cut - overlap
     return chunks
 
-
-# ═══════════════════════════════════════════════════════════
-# 4. 网络搜索
-# ═══════════════════════════════════════════════════════════
 
 def web_search(query: str, top_k: int = 3) -> list[dict]:
     """使用 DuckDuckGo 搜索，返回 [{title, snippet, url}]。"""
@@ -283,72 +340,128 @@ def web_search(query: str, top_k: int = 3) -> list[dict]:
         logger.warning("网络搜索失败: %s", e)
         return []
 
-
 # ═══════════════════════════════════════════════════════════
 # 5. 知识提取辅助
 # ═══════════════════════════════════════════════════════════
 
-def build_page_context(pages: list[dict], current_idx: int, context_pages: int = 1) -> str:
-    """构建当前页的上下文（前后共 context_pages 页）。"""
-    start = max(0, current_idx - context_pages)
-    end = min(len(pages), current_idx + context_pages + 1)
-
-    parts = []
-    for i in range(start, end):
-        prefix = "【上文】" if i < current_idx else ("【下文】" if i > current_idx else "【当前页】")
-        parts.append(f"{prefix} 第{pages[i]['page_num']}页:\n{pages[i]['text'][:500]}")
-    return "\n\n".join(parts)
+def _providers() -> list[str]:
+    """返回降级链 provider 列表(按 LLM_PROVIDERS 顺序)。"""
+    from bobanana.config import LLM_PROVIDER, LLM_PROVIDERS
+    raw = (LLM_PROVIDERS or "").strip()
+    if not raw:
+        raw = (LLM_PROVIDER or "deepseek").strip()
+    providers = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    return providers or ["deepseek"]
 
 
-# ═══════════════════════════════════════════════════════════
-# 6. LLM 调用
-# ═══════════════════════════════════════════════════════════
-
-_llm = None
-
-
-def get_llm():
-    """懒加载 LLM 实例。"""
-    global _llm
-    if _llm is not None:
-        return _llm
-
+def _construct_llm(provider: str):
+    """按 provider 名构造 LLM 实例。构造失败/无凭据时返回 None。"""
     from bobanana.config import (
-        LLM_PROVIDER, LLM_TEMPERATURE,
-        OPENAI_API_KEY, OPENAI_MODEL,
-        OLLAMA_BASE_URL, OLLAMA_MODEL,
-        DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL,
+        DEEPSEEK_API_KEY,
+        DEEPSEEK_BASE_URL,
+        DEEPSEEK_MODEL,
+        LLM_TEMPERATURE,
+        OLLAMA_BASE_URL,
+        OLLAMA_MODEL,
+        OPENAI_API_KEY,
+        OPENAI_BASE_URL,
+        OPENAI_MODEL,
     )
 
-    if LLM_PROVIDER == "deepseek":
+    provider = (provider or "").strip().lower()
+    if provider == "deepseek":
         from langchain_openai import ChatOpenAI
         api_key = DEEPSEEK_API_KEY or OPENAI_API_KEY
-        _llm = ChatOpenAI(
+        if not api_key:
+            logger.debug("DeepSeek 无 API Key, 跳过")
+            return None
+        return ChatOpenAI(
             model=DEEPSEEK_MODEL,
             temperature=LLM_TEMPERATURE,
             api_key=api_key,
             base_url=DEEPSEEK_BASE_URL,
         )
-        logger.info("LLM 就绪: DeepSeek %s @ %s", DEEPSEEK_MODEL, DEEPSEEK_BASE_URL)
-    elif LLM_PROVIDER == "openai":
+    if provider == "openai":
         from langchain_openai import ChatOpenAI
-        _llm = ChatOpenAI(
+        if not OPENAI_API_KEY:
+            logger.debug("OpenAI 无 API Key, 跳过")
+            return None
+        return ChatOpenAI(
             model=OPENAI_MODEL,
             temperature=LLM_TEMPERATURE,
             api_key=OPENAI_API_KEY,
+            base_url=OPENAI_BASE_URL,
         )
-        logger.info("LLM 就绪: OpenAI %s", OPENAI_MODEL)
-    else:
-        from langchain_community.chat_models import ChatOllama
-        _llm = ChatOllama(
-            model=OLLAMA_MODEL,
-            base_url=OLLAMA_BASE_URL,
-            temperature=LLM_TEMPERATURE,
-        )
-        logger.info("LLM 就绪: Ollama %s @ %s", OLLAMA_MODEL, OLLAMA_BASE_URL)
+    if provider == "ollama":
+        try:
+            from langchain_community.chat_models import ChatOllama
+            return ChatOllama(
+                model=OLLAMA_MODEL,
+                base_url=OLLAMA_BASE_URL,
+                temperature=LLM_TEMPERATURE,
+            )
+        except Exception:
+            try:
+                from langchain_community.llms.ollama import Ollama
+                return Ollama(
+                    model=OLLAMA_MODEL,
+                    base_url=OLLAMA_BASE_URL,
+                    temperature=LLM_TEMPERATURE,
+                )
+            except Exception:
+                logger.debug("Ollama 集成不可用, 跳过")
+                return None
+    return None
 
-    return _llm
 
+def _is_circuit_open(provider: str) -> bool:
+    """检查 provider 是否处于熔断冷却期。"""
+    with _provider_circuit_lock:
+        until = _provider_circuit.get(provider)
+        if until is None:
+            return False
+        if time.monotonic() < until:
+            return True
+        _provider_circuit.pop(provider, None)
+        return False
+
+
+def _trip_circuit(provider: str) -> None:
+    """熔断 provider, 冷却 60s。"""
+    with _provider_circuit_lock:
+        _provider_circuit[provider] = time.monotonic() + _PROVIDER_COOLDOWN_SEC
+
+
+def get_llm(provider: str = None):
+    """懒加载 LLM 实例。
+
+    provider 缺省时按降级链顺序返回第一个可用(未熔断且可构造)的候选,
+    并更新 _llm 以保持旧调用兼容。
+    """
+    global _llm
+    if provider is not None:
+        p = provider.strip().lower()
+        if p not in _llm_cache:
+            inst = _construct_llm(p)
+            _llm_cache[p] = inst
+            if inst is not None:
+                _llm = inst
+                logger.info("LLM 就绪: %s", p)
+        return _llm_cache.get(p)
+
+    for p in _providers():
+        if _is_circuit_open(p):
+            continue
+        inst = get_llm(p)
+        if inst is not None:
+            return inst
+
+    # 全部熔断或不可构造时, 返回第一个可构造实例(即便熔断, 供调用方决策)
+    for p in _providers():
+        inst = get_llm(p)
+        if inst is not None:
+            return inst
+    return None
 
 # ═══════════════════════════════════════════════════════════
 # 7. 文档预扫描器 (Phase 1)
@@ -356,7 +469,10 @@ def get_llm():
 
 class ScanResult:
     """预扫描结果。"""
-    def __init__(self, total_pages=0, valid_ranges=None, language="zh", doc_type="unknown", skipped_pages=None, pages=None):
+    def __init__(
+        self, total_pages=0, valid_ranges=None, language="zh",
+        doc_type="unknown", skipped_pages=None, pages=None,
+    ):
         self.total_pages = total_pages
         self.valid_ranges = valid_ranges or []  # [(start, end, topic), ...]
         self.language = language
@@ -364,14 +480,13 @@ class ScanResult:
         self.skipped_pages = skipped_pages or []
         self.pages = pages or []
 
-
 class DocumentScanner:
     """Phase 1: 预扫描文档结构，识别有效内容区间。"""
 
     MIN_CONTENT_CHARS = 50  # 少于 50 个字符的页视为空白页
 
-    def scan(self, file_path: str) -> ScanResult:
-        pages = parse_document(file_path)
+    def scan(self, file_path: str, progress_callback=None) -> ScanResult:
+        pages = parse_document(file_path, progress_callback=progress_callback)
         if not pages:
             return ScanResult()
 
@@ -382,7 +497,8 @@ class DocumentScanner:
 
         logger.info(
             "预扫描: %d 页, 有效区间 %d 个, 跳过 %d 页, 类型=%s, 语言=%s",
-            total, len(valid_ranges), len(skipped), structure.get("doc_type","?"), structure.get("language","?"),
+            total, len(valid_ranges), len(skipped),
+            structure.get("doc_type", "?"), structure.get("language", "?"),
         )
         return ScanResult(
             total_pages=total,
@@ -464,37 +580,160 @@ class DocumentScanner:
 
         return valid_ranges, skipped
 
+def _is_chat_model(llm) -> bool:
+    """判断 LLM 实例是否为 Chat 模型(接受 messages 而非字符串)。"""
+    try:
+        from langchain_core.language_models.chat_models import BaseChatModel
+        return isinstance(llm, BaseChatModel)
+    except Exception:
+        return True
 
-def llm_invoke(system_prompt: str, user_prompt: str, timeout_sec: int = None) -> str:
-    """调用 LLM，返回文本结果。支持超时和重试。"""
-    import concurrent.futures
-    from langchain_core.messages import SystemMessage, HumanMessage
-    from bobanana.config import LLM_TIMEOUT_SEC
 
-    if timeout_sec is None:
-        timeout_sec = LLM_TIMEOUT_SEC
+def _is_retryable_llm_error(exc: Exception) -> bool:
+    """判断异常是否属于 auth/connection/timeout 类(可熔断降级)。"""
+    if isinstance(exc, TimeoutError):
+        return True
+    name = type(exc).__name__
+    try:
+        import openai
+        if isinstance(exc, (
+            openai.APIConnectionError, openai.APITimeoutError,
+            openai.AuthenticationError, openai.PermissionDeniedError,
+            openai.RateLimitError, openai.InternalServerError,
+        )):
+            return True
+    except Exception:
+        pass
+    name_l = name.lower()
+    _circuit_keys = ("auth", "timeout", "connection", "connect", "rate", "permission", "apierror")
+    if any(k in name_l for k in _circuit_keys):
+        return True
+    msg = str(exc).lower()
+    if any(k in msg for k in (
+        "401", "403", "429", "502", "503", "504",
+        "timeout", "timed out", "unauthorized", "connection",
+        "refused", "reset by peer", "api key", "apikey", "invalid_api_key",
+    )):
+        return True
+    return False
 
-    llm = get_llm()
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt),
-    ]
 
-    def _call():
-        response = llm.invoke(messages)
-        return response.content
+def _invoke_one(llm, messages, timeout_sec: int) -> str:
+    """对单个 LLM 实例执行调用(带超时)。"""
+    # 主线程内判断模型类型, 避免把 langchain 导入成本计入调用超时
+    chat_model = _is_chat_model(llm)
 
-    pool = concurrent.futures.ThreadPoolExecutor(1)
+    if chat_model:
+        def _call():
+            response = llm.invoke(messages)
+            return response.content
+    else:
+        prompt = "\n".join(
+            f"{getattr(m, 'type', 'user')}: {m.content}" for m in messages
+        )
+        def _call():
+            response = llm.invoke(prompt)
+            return response if isinstance(response, str) else str(response)
+
+    pool = _get_llm_executor()
     future = pool.submit(_call)
     try:
         return future.result(timeout=timeout_sec)
     except concurrent.futures.TimeoutError:
-        logger.warning("LLM 调用超时 (%.0fs)", timeout_sec)
-        pool.shutdown(wait=False)
-        raise TimeoutError(f"LLM 调用超时 ({timeout_sec}s)")
+        raise TimeoutError(f"LLM 调用超时 ({timeout_sec}s)") from None
+
+
+def _record_llm_metric(succeeded: bool, start_time: float) -> None:
+    """LLM 调用指标埋点 — 任何异常仅记日志, 不影响降级链/业务。"""
+    try:
+        from bobanana.observability import metrics
+        if succeeded:
+            metrics.inc("llm_calls_total")
+            metrics.observe("llm_call_seconds", time.monotonic() - start_time)
+        else:
+            metrics.inc("llm_errors_total")
+    except Exception as e:  # noqa: BLE001
+        logger.debug("LLM 指标埋点失败: %s", e)
+
+
+def llm_invoke(system_prompt: str, user_prompt: str, timeout_sec: int = None) -> str:
+    """调用 LLM，返回文本结果。
+
+    按降级链顺序尝试 provider;auth/connection/timeout 类失败会熔断该
+    provider(冷却 60s)并尝试下一个, 全部失败抛 SWError(SW-LLM-503)。
+    """
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from bobanana.config import LLM_TIMEOUT_SEC
+    from bobanana.errors import SW_LLM_503, SWError
+
+    start_time = time.monotonic()
+    succeeded = False
+    try:
+        if timeout_sec is None:
+            timeout_sec = LLM_TIMEOUT_SEC
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+
+        last_err = None
+        tried = []
+        for provider in _providers():
+            if _is_circuit_open(provider):
+                continue
+            llm = get_llm(provider)
+            if llm is None:
+                continue
+            tried.append(provider)
+            try:
+                result = _invoke_one(llm, messages, timeout_sec)
+                succeeded = True
+                return result
+            except Exception as e:
+                if _is_retryable_llm_error(e):
+                    _trip_circuit(provider)
+                    last_err = e
+                    logger.warning("LLM provider %s 调用失败, 熔断 %.0fs: %s",
+                                   provider, _PROVIDER_COOLDOWN_SEC, e)
+                else:
+                    logger.error("LLM 调用失败(非可重试): %s", e)
+                    raise
+
+        detail = f"providers={','.join(tried) or 'none'}; last_error={last_err}"
+        raise SWError(error_code=SW_LLM_503, message="LLM 服务暂时不可用，请稍后重试", detail=detail)
+    finally:
+        _record_llm_metric(succeeded, start_time)
+
+
+def llm_stream(system_prompt: str, user_prompt: str):
+    """流式生成器, 逐块 yield 文本。失败时降级为一次 llm_invoke 后单块 yield。"""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt),
+    ]
+    try:
+        llm = get_llm()
+        if llm is None or not hasattr(llm, "stream") or not _is_chat_model(llm):
+            raise RuntimeError("当前 provider 不支持流式, 降级")
+        for chunk in llm.stream(messages):
+            content = getattr(chunk, "content", "")
+            if isinstance(content, str) and content:
+                yield content
+            elif isinstance(content, list):
+                for part in content:
+                    if isinstance(part, str):
+                        yield part
+                    elif isinstance(part, dict) and part.get("type") == "text":
+                        yield part.get("text", "")
     except Exception as e:
-        logger.error("LLM 调用失败: %s", e)
-        pool.shutdown(wait=True)
-        raise
-    else:
-        pool.shutdown(wait=True)
+        logger.warning("LLM 流式失败, 降级为单次 llm_invoke: %s", e)
+        try:
+            text = llm_invoke(system_prompt, user_prompt)
+            if text:
+                yield text
+        except Exception:
+            yield ""

@@ -2,9 +2,10 @@
 
 import os
 import tempfile
+
 import pytest
 
-from bobanana.tools import parse_document, chunk_text
+from bobanana.tools import _parse_pdf, chunk_text, parse_document
 
 
 class TestDocumentParsing:
@@ -67,9 +68,40 @@ class TestDocumentParsing:
             os.unlink(tmp_path)
 
     def test_nonexistent_file(self):
-        """不存在的文件。"""
-        with pytest.raises(Exception):
-            parse_document("/nonexistent/file.pdf")
+        """不存在的文件 — 降级返回空页，不崩溃。"""
+        pages = parse_document("/nonexistent/file.pdf")
+        assert isinstance(pages, list)
+        assert len(pages) == 1
+        assert pages[0]["text"] == ""
+
+    def test_progress_callback(self):
+        """PDF 解析进度回调。"""
+        import fitz
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.close()
+        try:
+            doc = fitz.open()
+            for i in range(5):
+                page = doc.new_page()
+                page.insert_text((50, 100), f"第{i+1}页内容")
+            doc.save(tmp.name)
+            doc.close()
+
+            progress_events = []
+            def cb(event):
+                progress_events.append(event)
+
+            pages = _parse_pdf(tmp.name, progress_callback=cb)
+            assert len(pages) >= 1
+            assert len(progress_events) >= 1
+            last_evt = progress_events[-1]
+            assert last_evt["stage"] == "parse"
+            assert last_evt["current"] >= 5
+        finally:
+            try:
+                os.unlink(tmp.name)
+            except Exception:
+                pass
 
 
 class TestChunkText:

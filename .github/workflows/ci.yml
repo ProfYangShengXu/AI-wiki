@@ -1,0 +1,124 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 手动触发：用于运行真实大模型测试（real-llm job）等。
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: backend (${{ matrix.os }} / ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # 一个组合失败不取消其它组合，便于定位平台/版本差异。
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint
+        run: |
+          ruff check bobanana tests scripts
+          mypy bobanana
+      - name: Test
+        # 默认排除 llm 标记（需要真实 DEEPSEEK_API_KEY 的用例），
+        # 由 real-llm job 手动触发。 -n auto 使用 pytest-xdist 并行，
+        # 在 Windows 上同样可用（xdist 基于 execnet，不依赖 fork）；
+        # 若后续发现个别测试与 xdist 冲突（共享 ChromaDB 全局状态），
+        # 可去掉 -n auto 或给冲突用例加串行标记。
+        run: pytest tests -q -m "not llm" --cov=bobanana --cov-report=xml --cov-report=term-missing -n auto
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-${{ matrix.python }}
+          path: coverage.xml
+
+  client:
+    name: client (windows-latest)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-pub
+      - name: Test
+        run: flutter test
+      - name: Build Windows
+        run: flutter build windows
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-windows
+          # upload-artifact 的 path 相对仓库根解析,不受 job 级 working-directory 影响
+          path: client/build/windows/x64/runner/Release/
+      - name: Build Android APK (debug)
+        run: flutter build apk --debug
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-apk-debug
+          path: client/build/app/outputs/flutter-apk/app-debug.apk
+      # 说明：本 job 只产出可安装的调试产物（Windows 目录 / debug APK）。
+      # 正式的签名（Windows 代码签名 / MSIX 打包 / Android AAB + 签名）需要
+      # 在仓库 Settings -> Secrets 配置签名证书与密钥，另加 release 工作流；
+      # 此处暂不涉及，避免泄露签名材料。
+
+  backend-package:
+    name: backend-package (windows exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build study-wiki-core.exe
+        # 附带 static/ 与 api/openapi.yaml 数据文件(Windows 用 ";" 分隔)。
+        run: >
+          pyinstaller --onefile --name study-wiki-core
+          --add-data "static;static" --add-data "api;api"
+          main.py
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-wiki-core-exe
+          path: dist/study-wiki-core.exe
+
+  real-llm:
+    name: real-llm (manual)
+    # 仅在手动 workflow_dispatch 触发时运行，避免 CI 消费真实大模型额度。
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run real LLM tests
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: pytest -m llm -q

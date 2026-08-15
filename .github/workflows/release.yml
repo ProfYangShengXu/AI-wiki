@@ -1,0 +1,136 @@
+# 灰测 Release 工作流 — 构建三端产物并发布 GitHub 预发布版
+#
+# 触发方式:
+#   1. 手动: Actions → "gray release" → Run workflow(可选填 tag,默认 gray-<run_number>)
+#   2. 自动: 推送 v* 标签(正式发版)
+#
+# 产物:
+#   - study-wiki-core.exe       后端 sidecar (PyInstaller onefile)
+#   - client-windows.zip        Windows 客户端(解压即用)
+#   - studywiki-client-debug.apk  Android 调试包(灰测安装)
+#
+# 灰测版一律发布为 prerelease(非正式),配合 docs/gray-test-checklist.md 使用。
+
+name: gray release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "发布标签(留空则自动生成 gray-<run_number>)"
+        required: false
+        default: ""
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-backend:
+    name: build-backend (windows exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build study-wiki-core.exe
+        run: >
+          pyinstaller --onefile --name study-wiki-core
+          --add-data "static;static" --add-data "api;api"
+          main.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-exe
+          path: dist/study-wiki-core.exe
+
+  build-client-windows:
+    name: build-client-windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build windows
+      - name: Zip Windows 客户端
+        shell: pwsh
+        run: |
+          Compress-Archive -Path client/build/windows/x64/runner/Release/* -DestinationPath client-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-windows
+          path: client-windows.zip
+
+  build-client-apk:
+    name: build-client-apk
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build apk --debug
+      - name: 重命名 APK
+        shell: pwsh
+        run: |
+          Copy-Item client/build/app/outputs/flutter-apk/app-debug.apk studywiki-client-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-apk
+          path: studywiki-client-debug.apk
+
+  publish:
+    name: publish gray release
+    needs: [build-backend, build-client-windows, build-client-apk]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: 确定发布标签
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=gray-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: 发布 GitHub Release(预发布)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: "灰测版 ${{ steps.tag.outputs.name }}"
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            artifacts/backend-exe/study-wiki-core.exe
+            artifacts/client-windows/client-windows.zip
+            artifacts/client-apk/studywiki-client-debug.apk
+          body: |
+            ## 灰测说明
+            本版本为灰度测试版(pre-release),请按 `docs/gray-test-checklist.md` 执行测试并反馈。
+
+            ### 安装
+            - Windows: 解压 `client-windows.zip` 运行客户端;或直接运行 `study-wiki-core.exe` 后浏览器打开 http://127.0.0.1:8000
+            - Android: 安装 `studywiki-client-debug.apk`(允许未知来源)
+
+            ### 已知注意事项
+            - 首次启动需配置 DeepSeek API Key(灰屏引导)
+            - Windows 智能屏未签名,可能出现 SmartScreen 提示,选择"仍要运行"
+            - 问题反馈: https://github.com/ProfYangShengXu/AI-wiki/issues

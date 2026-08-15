@@ -1,0 +1,50 @@
+{"id": "R-01", "query": "什么是与门", "expected_keywords": ["与门", "AND"]}
+{"id": "R-02", "query": "或门的真值表", "expected_keywords": ["或门", "OR"]}
+{"id": "R-03", "query": "非门的作用是什么", "expected_keywords": ["非门", "NOT"]}
+{"id": "R-04", "query": "异或门和或门的区别", "expected_keywords": ["异或", "XOR"]}
+{"id": "R-05", "query": "为什么与非门被称为万能门", "expected_keywords": ["与非", "NAND"]}
+{"id": "R-06", "query": "半加器的原理", "expected_keywords": ["半加器"]}
+{"id": "R-07", "query": "全加器的进位怎么计算", "expected_keywords": ["全加器", "进位"]}
+{"id": "R-08", "query": "译码器有什么用途", "expected_keywords": ["译码器"]}
+{"id": "R-09", "query": "多路选择器是什么", "expected_keywords": ["多路选择器", "MUX"]}
+{"id": "R-10", "query": "编码器的作用", "expected_keywords": ["编码器"]}
+{"id": "R-11", "query": "基尔霍夫电流定律内容", "expected_keywords": ["KCL", "基尔霍夫"]}
+{"id": "R-12", "query": "KVL的公式怎么写", "expected_keywords": ["KVL", "基尔霍夫"]}
+{"id": "R-13", "query": "节点电压法怎么列方程", "expected_keywords": ["节点电压"]}
+{"id": "R-14", "query": "回路电流法是什么", "expected_keywords": ["回路电流"]}
+{"id": "R-15", "query": "基尔霍夫定律适用于什么电路", "expected_keywords": ["基尔霍夫", "集总"]}
+{"id": "R-16", "query": "戴维南定理的内容", "expected_keywords": ["戴维南"]}
+{"id": "R-17", "query": "戴维南等效电阻怎么求", "expected_keywords": ["戴维南", "等效电阻"]}
+{"id": "R-18", "query": "诺顿定理是什么", "expected_keywords": ["诺顿"]}
+{"id": "R-19", "query": "最大功率传输的条件", "expected_keywords": ["最大功率", "负载"]}
+{"id": "R-20", "query": "戴维南和诺顿等效怎么互相转换", "expected_keywords": ["戴维南", "诺顿"]}
+{"id": "R-21", "query": "PN结是如何形成的", "expected_keywords": ["PN结", "耗尽层"]}
+{"id": "R-22", "query": "二极管为什么能单向导电", "expected_keywords": ["二极管", "单向导电"]}
+{"id": "R-23", "query": "二极管的伏安特性曲线", "expected_keywords": ["二极管", "伏安特性"]}
+{"id": "R-24", "query": "稳压二极管的工作原理", "expected_keywords": ["稳压", "齐纳"]}
+{"id": "R-25", "query": "什么是二极管正偏和反偏", "expected_keywords": ["二极管", "正偏", "反偏"]}
+{"id": "R-26", "query": "共射极放大电路的特点", "expected_keywords": ["共射极", "三极管"]}
+{"id": "R-27", "query": "什么是三极管的静态工作点", "expected_keywords": ["静态工作点", "三极管"]}
+{"id": "R-28", "query": "三极管的放大倍数β是什么", "expected_keywords": ["放大倍数", "β"]}
+{"id": "R-29", "query": "饱和失真和截止失真的区别", "expected_keywords": ["失真", "饱和", "截止"]}
+{"id": "R-30", "query": "三极管的三个电极分别是什么", "expected_keywords": ["三极管", "基极", "集电极", "发射极"]}
+{"id": "R-31", "query": "高斯定律的内容", "expected_keywords": ["高斯", "麦克斯韦"]}
+{"id": "R-32", "query": "法拉第电磁感应定律", "expected_keywords": ["法拉第", "麦克斯韦"]}
+{"id": "R-33", "query": "什么是位移电流", "expected_keywords": ["位移电流", "麦克斯韦"]}
+{"id": "R-34", "query": "安培环路定理是什么", "expected_keywords": ["安培", "麦克斯韦"]}
+{"id": "R-35", "query": "麦克斯韦方程组包含哪四个方程", "expected_keywords": ["麦克斯韦方程组"]}
+{"id": "R-36", "query": "冯诺依曼结构的五大部件", "expected_keywords": ["冯诺依曼", "五大部件"]}
+{"id": "R-37", "query": "什么是存储程序", "expected_keywords": ["存储程序", "冯诺依曼"]}
+{"id": "R-38", "query": "指令周期包含哪些阶段", "expected_keywords": ["指令周期", "取指"]}
+{"id": "R-39", "query": "运算器的功能是什么", "expected_keywords": ["运算器", "CPU"]}
+{"id": "R-40", "query": "程序计数器PC的作用", "expected_keywords": ["程序计数器", "PC"]}
+{"id": "R-41", "query": "栈为什么是后进先出", "expected_keywords": ["栈", "LIFO"]}
+{"id": "R-42", "query": "队列的先进先出是什么意思", "expected_keywords": ["队列", "FIFO"]}
+{"id": "R-43", "query": "栈有哪些典型应用", "expected_keywords": ["栈", "调用栈"]}
+{"id": "R-44", "query": "什么是循环队列", "expected_keywords": ["循环队列", "假溢出"]}
+{"id": "R-45", "query": "如何用栈实现括号匹配", "expected_keywords": ["栈", "括号匹配"]}
+{"id": "R-46", "query": "进程和线程的区别", "expected_keywords": ["进程", "线程"]}
+{"id": "R-47", "query": "PCB里保存了什么信息", "expected_keywords": ["PCB", "进程"]}
+{"id": "R-48", "query": "上下文切换是什么", "expected_keywords": ["上下文切换"]}
+{"id": "R-49", "query": "并发和并行有什么区别", "expected_keywords": ["并发", "并行"]}
+{"id": "R-50", "query": "同一进程的线程共享哪些资源", "expected_keywords": ["线程", "共享"]}

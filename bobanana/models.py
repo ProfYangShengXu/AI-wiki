@@ -1,9 +1,8 @@
 """数据模型定义 — KnowledgeCard 及其 API Schema。"""
 
-from datetime import datetime, timezone
-from typing import Optional
-from pydantic import BaseModel, Field
+from datetime import UTC, datetime
 
+from pydantic import BaseModel, Field
 
 # ── 内部模型 ──────────────────────────────────────────────
 
@@ -19,8 +18,10 @@ class KnowledgeCard(BaseModel):
     source_file: str = Field(default="", description="来源文件名")
     source_page: int = Field(default=0, description="来源页码")
     related_cards: list[str] = Field(default_factory=list, description="关联卡片 ID 列表")
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    mastery_attempts: int = Field(default=0, description="答题次数")
+    mastery_score: int = Field(default=0, description="累计最高分")
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def embedding_text(self) -> str:
         """生成用于向量嵌入的文本。"""
@@ -47,15 +48,15 @@ class CardCreate(BaseModel):
 
 class CardUpdate(BaseModel):
     """更新卡片请求（所有字段可选）。"""
-    title: Optional[str] = None
-    aliases: Optional[list[str]] = None
-    content: Optional[str] = None
-    examples: Optional[list[str]] = None
-    questions: Optional[list[str]] = None
-    category: Optional[str] = None
-    source_file: Optional[str] = None
-    source_page: Optional[int] = None
-    related_cards: Optional[list[str]] = None
+    title: str | None = None
+    aliases: list[str] | None = None
+    content: str | None = None
+    examples: list[str] | None = None
+    questions: list[str] | None = None
+    category: str | None = None
+    source_file: str | None = None
+    source_page: int | None = None
+    related_cards: list[str] | None = None
 
 
 # ── API 响应 Schema ──────────────────────────────────────
@@ -94,17 +95,25 @@ class ImportResult(BaseModel):
 class ApiResponse(BaseModel):
     """统一 API 响应格式。"""
     status: str = Field(..., pattern="^(success|error)$")
-    data: Optional[dict] = None
+    data: dict | None = None
     message: str = ""
-    error_code: Optional[str] = None
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    error_code: str | None = None
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # ── WebSocket 消息 ───────────────────────────────────────
 
 class WSMessage(BaseModel):
     """WebSocket 消息。"""
-    type: str = Field(..., pattern="^(message|response|progress|card_preview|card_update|error)$")
+    # Phase 2 事件字典(契约 §1.4):在原有类型基础上新增流式/工具/审批/会话事件。
+    type: str = Field(
+        ...,
+        pattern=(
+            "^(message|response|progress|card_preview|card_update|error|"
+            "llm.delta|tool.called|tool.result|approval_required|approval|"
+            "session.started|session.done|session.error)$"
+        ),
+    )
     content: str = ""
-    data: Optional[dict] = None
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    data: dict | None = None
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

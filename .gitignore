@@ -9,6 +9,12 @@ build/
 # ChromaDB persistence
 chroma_db/
 
+# Runtime data (Phase 2)
+tmp/
+data/
+backups/
+docs/eval/results/
+
 # Upload files
 uploads/*
 !uploads/.gitkeep
@@ -37,6 +43,7 @@ logs/
 
 # Python virtual env
 .venv/
+.venv-linux/
 venv/
 
 # LTspice installer
@@ -63,6 +70,17 @@ htmlcov/
 
 # Node
 node_modules/
+# Flutter
+client/.dart_tool/
+client/build/
+client/.flutter-plugins
+client/.flutter-plugins-dependencies
+client/android/.gradle/
+client/android/local.properties
+client/windows/flutter/ephemeral/
+
 
 # Editor swap files
 *~
+# Reasonix 运行时状态
+.reasonix/

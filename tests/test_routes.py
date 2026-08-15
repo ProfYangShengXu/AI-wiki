@@ -1,43 +1,8 @@
 """API 路由集成测试 — 使用 FastAPI TestClient。"""
 
-import pytest
 from fastapi.testclient import TestClient
+
 from bobanana.app import app
-from bobanana.database import db_manager
-from bobanana.config import CHROMA_DB_DIR
-
-TEST_COLLECTION = "test_route_cards"
-
-
-@pytest.fixture(autouse=True)
-def init_db():
-    """每个测试前后初始化 ChromaDB + 隔离测试集合。"""
-    import chromadb
-    # 若未初始化，直接创建客户端
-    if db_manager._client is None:
-        db_manager._client = chromadb.PersistentClient(
-            path=str(CHROMA_DB_DIR),
-            settings=chromadb.config.Settings(anonymized_telemetry=False),
-        )
-    # 清理旧测试集合
-    try:
-        db_manager._client.delete_collection(TEST_COLLECTION)
-    except Exception:
-        pass
-    # 创建测试集合
-    test_col = db_manager._client.create_collection(
-        name=TEST_COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
-    old_col = db_manager._collection
-    db_manager._collection = test_col
-    yield
-    db_manager._collection = old_col
-    try:
-        db_manager._client.delete_collection(TEST_COLLECTION)
-    except Exception:
-        pass
-
 
 client = TestClient(app)
 
