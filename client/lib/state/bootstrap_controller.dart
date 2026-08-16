@@ -53,25 +53,38 @@ class BootstrapController extends Notifier<BootstrapState> {
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, message: '', isError: false);
-    try {
-      final status = await ref.read(apiClientProvider).getBootstrapStatus();
-      state = BootstrapState(
-        isLoading: false,
-        required: status.required,
-        provider: status.provider,
-        baseUrl: status.baseUrl,
-        keyTail: status.keyTail,
-        message: status.required ? '请配置 API Key 后开始使用' : '',
-      );
-    } catch (e) {
-      state = BootstrapState(
-        isLoading: false,
-        required: true,
-        provider: 'deepseek',
-        baseUrl: '',
-        message: '无法连接本地服务: ${_errorText(e)}',
-        isError: true,
-      );
+    // 后端 sidecar 冷启动需 10-20s(慢机器更久),这里带重试轮询,
+    // 避免刚启动时灰屏直接报"无法连接"。
+    const maxAttempts = 20; // 20 × 3s = 60s 窗口
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final status = await ref.read(apiClientProvider).getBootstrapStatus();
+        state = BootstrapState(
+          isLoading: false,
+          required: status.required,
+          provider: status.provider,
+          baseUrl: status.baseUrl,
+          keyTail: status.keyTail,
+          message: status.required ? '请配置 API Key 后开始使用' : '',
+        );
+        return;
+      } catch (e) {
+        if (attempt < maxAttempts) {
+          state = state.copyWith(
+            message: '正在连接本地服务($attempt/$maxAttempts)…',
+          );
+          await Future<void>.delayed(const Duration(seconds: 3));
+          continue;
+        }
+        state = BootstrapState(
+          isLoading: false,
+          required: true,
+          provider: 'deepseek',
+          baseUrl: '',
+          message: '无法连接本地服务: ${_errorText(e)}',
+          isError: true,
+        );
+      }
     }
   }
 
@@ -79,6 +92,7 @@ class BootstrapController extends Notifier<BootstrapState> {
     required String provider,
     required String apiKey,
     required String baseUrl,
+    String model = '',
   }) async {
     state = state.copyWith(message: '正在验证 Key ...', isError: false);
     try {
@@ -86,6 +100,7 @@ class BootstrapController extends Notifier<BootstrapState> {
             provider: provider,
             apiKey: apiKey,
             baseUrl: baseUrl,
+            model: model,
           );
       state = state.copyWith(
         message: result.ok
@@ -105,6 +120,7 @@ class BootstrapController extends Notifier<BootstrapState> {
     required String provider,
     required String apiKey,
     required String baseUrl,
+    String model = '',
   }) async {
     state = state.copyWith(message: '正在验证并保存 ...', isError: false);
     try {
@@ -112,6 +128,7 @@ class BootstrapController extends Notifier<BootstrapState> {
             provider: provider,
             apiKey: apiKey,
             baseUrl: baseUrl,
+            model: model,
           );
       if (result.ok) {
         state = BootstrapState(

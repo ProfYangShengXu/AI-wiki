@@ -44,6 +44,15 @@ jobs:
           pyinstaller --onefile --name study-wiki-core
           --add-data "static;static" --add-data "api;api"
           main.py
+      - name: 代码签名(若配置了证书)
+        if: env.CODE_SIGN_PFX_BASE64 != ''
+        shell: pwsh
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PFX_PASSWORD: ${{ secrets.CODE_SIGN_PFX_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CODE_SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist\study-wiki-core.exe
       - uses: actions/upload-artifact@v4
         with:
           name: backend-exe
@@ -52,6 +61,7 @@ jobs:
   build-client-windows:
     name: build-client-windows
     runs-on: windows-latest
+    needs: [build-backend]
     defaults:
       run:
         working-directory: client
@@ -62,14 +72,19 @@ jobs:
           channel: stable
       - run: flutter pub get
       - run: flutter build windows
-      - name: Zip Windows 客户端
+      - name: 内置后端 sidecar exe(客户端自动拉起)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-exe
+          path: client/build/windows/x64/runner/Release
+      - name: Zip Windows 客户端(自包含:客户端 + study-wiki-core.exe)
         shell: pwsh
         run: |
-          Compress-Archive -Path client/build/windows/x64/runner/Release/* -DestinationPath client-windows.zip
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath client-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: client-windows
-          path: client-windows.zip
+          path: client/client-windows.zip
 
   build-client-apk:
     name: build-client-apk
@@ -87,15 +102,90 @@ jobs:
       - name: 重命名 APK
         shell: pwsh
         run: |
-          Copy-Item client/build/app/outputs/flutter-apk/app-debug.apk studywiki-client-debug.apk
+          Copy-Item build/app/outputs/flutter-apk/app-debug.apk studywiki-client-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: client-apk
-          path: studywiki-client-debug.apk
+          path: client/studywiki-client-debug.apk
+
+  build-installer:
+    name: build-installer (一键安装包)
+    runs-on: windows-latest
+    needs: [build-backend, build-client-windows]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 下载后端与客户端产物
+        uses: actions/download-artifact@v4
+        with:
+          path: stage
+      - name: 下载 VC++ 运行库
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "stage\vc_redist.x64.exe"
+      - name: 组装安装目录
+        shell: pwsh
+        run: |
+          Expand-Archive -Path stage/client-windows/client-windows.zip -DestinationPath stage/client
+          New-Item -ItemType Directory -Force -Path stage/client | Out-Null
+          Copy-Item stage/backend-exe/study-wiki-core.exe stage/study-wiki-core.exe
+      - name: 安装 Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: 生成安装脚本
+        shell: pwsh
+        run: |
+          @'
+          [Setup]
+          AppName=StudyWiki-Agent
+          AppVersion=0.9.0
+          DefaultDirName={autopf}\StudyWiki-Agent
+          DefaultGroupName=StudyWiki-Agent
+          OutputDir=dist
+          OutputBaseFilename=studywiki-setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          PrivilegesRequired=lowest
+          WizardStyle=modern
+          UninstallDisplayIcon={app}\client\studywiki_client.exe
+
+          [Files]
+          Source: "stage\client\*"; DestDir: "{app}\client"; Flags: recursesubdirs ignoreversion
+          Source: "stage\study-wiki-core.exe"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "stage\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+
+          [Icons]
+          Name: "{autoprograms}\StudyWiki-Agent"; Filename: "{app}\client\studywiki_client.exe"
+          Name: "{autodesktop}\StudyWiki-Agent"; Filename: "{app}\client\studywiki_client.exe"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务:"
+
+          [Run]
+          Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "安装 VC++ 运行库..."; Flags: waituntilterminated
+          Filename: "{app}\client\studywiki_client.exe"; Description: "立即启动 StudyWiki-Agent"; Flags: nowait postinstall skipifsilent
+          '@ | Set-Content -Encoding UTF8 installer.iss
+      - name: 编译安装包
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+      - name: 安装包代码签名(若配置了证书)
+        if: env.CODE_SIGN_PFX_BASE64 != ''
+        shell: pwsh
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PFX_PASSWORD: ${{ secrets.CODE_SIGN_PFX_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CODE_SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist\studywiki-setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/studywiki-setup.exe
 
   publish:
     name: publish gray release
-    needs: [build-backend, build-client-windows, build-client-apk]
+    needs: [build-backend, build-client-windows, build-client-apk, build-installer]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -122,15 +212,17 @@ jobs:
             artifacts/backend-exe/study-wiki-core.exe
             artifacts/client-windows/client-windows.zip
             artifacts/client-apk/studywiki-client-debug.apk
+            artifacts/installer/studywiki-setup.exe
           body: |
             ## 灰测说明
             本版本为灰度测试版(pre-release),请按 `docs/gray-test-checklist.md` 执行测试并反馈。
 
-            ### 安装
-            - Windows: 解压 `client-windows.zip` 运行客户端;或直接运行 `study-wiki-core.exe` 后浏览器打开 http://127.0.0.1:8000
+            ### 安装(推荐)
+            - Windows: 下载 **`studywiki-setup.exe`** 一键安装(前后端一起装好,桌面/开始菜单快捷方式,双击即用)
+            - 免安装版: 解压 `client-windows.zip` 双击 `studywiki_client.exe`(自动拉起内置后端,托盘常驻)
             - Android: 安装 `studywiki-client-debug.apk`(允许未知来源)
 
             ### 已知注意事项
-            - 首次启动需配置 DeepSeek API Key(灰屏引导)
-            - Windows 智能屏未签名,可能出现 SmartScreen 提示,选择"仍要运行"
+            - 首次启动需配置 DeepSeek API Key(灰屏引导;后端冷启动约 10-20s,界面会自动重试等待)
+            - 安装包未签名,可能出现 SmartScreen 提示,选择"仍要运行"
             - 问题反馈: https://github.com/ProfYangShengXu/AI-wiki/issues

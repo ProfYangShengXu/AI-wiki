@@ -25,7 +25,7 @@ from pathlib import Path
 import chromadb
 from chromadb.config import Settings
 
-from bobanana.config import BASE_DIR, CHROMA_DB_DIR, UPLOAD_DIR
+from bobanana.config import CHROMA_DB_DIR, DATA_DIR, UPLOAD_DIR
 from bobanana.errors import SWError, sw_raise
 
 # ── 错误码常量 ──────────────────────────────────────────
@@ -33,7 +33,7 @@ SW_BACKUP_404 = "SW-BACKUP-404"   # 备份不存在
 SW_BACKUP_500 = "SW-BACKUP-500"   # 备份 / 恢复失败
 
 # ── 路径常量 ────────────────────────────────────────────
-BACKUP_DIR = BASE_DIR / "backups"
+BACKUP_DIR = DATA_DIR / "backups"
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)  # 已在 .gitignore
 
 _MANIFEST_VERSION = "1.0"

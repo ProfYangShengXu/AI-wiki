@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
 import '../services/offline_pack_service.dart';
+import '../services/sidecar_service.dart';
 import '../state/bootstrap_controller.dart';
 import 'offline_pack_page.dart';
 import 'pairing_page.dart';
@@ -35,6 +36,7 @@ class SettingsPage extends ConsumerWidget {
           title: const Text('供应商'),
           subtitle: Text(bootstrap.provider),
         ),
+        if (SidecarService.instance.isWindows) ..._sidecarTiles(context),
         const Divider(),
         ListTile(
           leading: const Icon(Icons.qr_code_scanner),
@@ -91,6 +93,68 @@ class SettingsPage extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// Windows 本地服务(sidecar)管理项。
+  List<Widget> _sidecarTiles(BuildContext context) {
+    return [
+      const Divider(),
+      const ListTile(
+        leading: Icon(Icons.settings_applications_outlined),
+        title: Text('本地服务'),
+        subtitle: Text('客户端自动拉起/停止后端 exe'),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Wrap(
+          spacing: 8,
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('启动后端'),
+              onPressed: () async {
+                final r = await SidecarService.instance.ensureBackendRunning();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(r.message)),
+                );
+              },
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.stop),
+              label: const Text('停止后端'),
+              onPressed: () async {
+                await SidecarService.instance.stopSidecar();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已请求停止后端(仅对本客户端拉起的进程生效)')),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: FutureBuilder<String?>(
+          future: SidecarService.instance.resolveSidecarExe(),
+          builder: (context, snap) {
+            final path = snap.data;
+            return Text(
+              path == null
+                  ? '未找到 study-wiki-core.exe:请将其放在客户端目录,或与后端手动连用'
+                  : 'sidecar: $path',
+              style: TextStyle(
+                fontSize: 12,
+                color: path == null
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.outline,
+              ),
+            );
+          },
+        ),
+      ),
+    ];
   }
 
   Future<void> _exportPack(BuildContext context, WidgetRef ref) async {

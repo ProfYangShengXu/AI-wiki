@@ -1,7 +1,7 @@
 name: studywiki_client
 description: StudyWiki-Agent Android / Windows client.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -16,6 +16,8 @@ dependencies:
   shared_preferences: ^2.3.3
   intl: ^0.19.0
   qr_flutter: ^4.1.0
+  tray_manager: ^0.5.3
+  ffi: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -24,3 +26,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/tray_icon.ico

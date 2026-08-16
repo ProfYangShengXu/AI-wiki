@@ -5,13 +5,14 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from bobanana import config
 from bobanana.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-ENV_PATH = BASE_DIR / ".env"
+ENV_PATH = config.ENV_FILE
 
 RELOAD_KEYS = {
     "OPENAI_API_KEY": "OpenAI API Key",
@@ -27,6 +28,7 @@ RELOAD_KEYS = {
     "LLM_MAX_TOKENS": "最大 Token 数",
     "LLM_TIMEOUT_SEC": "超时秒数",
     "EMBEDDING_PROVIDER": "嵌入模型 (openai/sentence-transformers)",
+    "HOST": "监听地址(127.0.0.1 仅本机 / 0.0.0.0 允许局域网配对)",
 }
 def _mask_value(key: str, value: str) -> str:
     """API Key 只显示尾号，其他值原样返回。"""

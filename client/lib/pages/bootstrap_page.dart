@@ -15,6 +15,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
   final _keyController = TextEditingController();
   final _baseUrlController = TextEditingController();
   String _provider = 'deepseek';
+  String _model = 'deepseek-chat';
   bool _obscureKey = true;
   bool _busy = false;
 
@@ -101,6 +102,9 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                                 if (value == null) return;
                                 setState(() {
                                   _provider = value;
+                                  _model = value == 'openai'
+                                      ? 'gpt-4o-mini'
+                                      : 'deepseek-chat';
                                   if (_baseUrlController.text.isEmpty) {
                                     _baseUrlController.text =
                                         value == 'openai'
@@ -131,6 +135,36 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                             ),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      _label('模型 (Model)'),
+                      DropdownButtonFormField<String>(
+                        value: _model,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'deepseek-chat',
+                            child: Text('deepseek-chat（通用）'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'deepseek-reasoner',
+                            child: Text('deepseek-reasoner（推理）'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'gpt-4o-mini',
+                            child: Text('gpt-4o-mini'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'gpt-4o',
+                            child: Text('gpt-4o'),
+                          ),
+                        ],
+                        onChanged: _busy
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setState(() => _model = value);
+                                }
+                              },
                       ),
                       const SizedBox(height: 12),
                       _label('API Base URL'),
@@ -214,6 +248,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
             provider: _provider,
             apiKey: key,
             baseUrl: _baseUrlController.text.trim(),
+            model: _model,
           );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -234,6 +269,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
             provider: _provider,
             apiKey: key,
             baseUrl: _baseUrlController.text.trim(),
+            model: _model,
           );
     } finally {
       if (mounted) setState(() => _busy = false);

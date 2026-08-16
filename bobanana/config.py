@@ -6,16 +6,23 @@ from typing import Literal
 
 from dotenv import load_dotenv
 
-# ── 加载 .env 文件（如果存在）────────────────────────────────
-load_dotenv()
-
 # ── 路径 ──────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-CHROMA_DB_DIR = BASE_DIR / "chroma_db"
+# 数据目录: 默认与程序同目录(便携版);安装版由客户端注入
+# STUDYWIki_DATA_DIR=%LOCALAPPDATA%\\StudyWiki-Agent\\data,
+# 避免往 Program Files 写数据导致权限拒绝、后端起不来。
+DATA_DIR: Path = Path(os.getenv("STUDYWIKI_DATA_DIR", str(BASE_DIR))).expanduser()
+# .env 也放数据目录:安装版 Program Files 不可写,Key 配置必须落在
+# 用户可写位置,load_dotenv 也从这里读取。
+ENV_FILE: Path = DATA_DIR / ".env"
+UPLOAD_DIR = DATA_DIR / "uploads"
+CHROMA_DB_DIR = DATA_DIR / "chroma_db"
 STATIC_DIR = BASE_DIR / "static"
 VENDOR_DIR = STATIC_DIR / "vendor"
-LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR = DATA_DIR / "logs"
+
+# ── 加载 .env 文件（如果存在）────────────────────────────────
+load_dotenv(dotenv_path=ENV_FILE)
 
 # ── LLM 配置 ─────────────────────────────────────────────────
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai | ollama | deepseek

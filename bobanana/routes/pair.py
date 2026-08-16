@@ -21,7 +21,7 @@ import time
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from bobanana.config import BASE_DIR
+from bobanana.config import DATA_DIR
 from bobanana.errors import SWError
 from bobanana.models import ApiResponse
 
@@ -32,7 +32,7 @@ SW_PAIR_400 = "SW-PAIR-400"
 SW_PAIR_401 = "SW-PAIR-401"
 SW_PAIR_404 = "SW-PAIR-404"
 
-PAIR_DATA_FILE = BASE_DIR / "data" / "pairing.json"
+PAIR_DATA_FILE = DATA_DIR / "data" / "pairing.json"
 CODE_TTL_SEC = 300
 
 _lock = threading.Lock()

@@ -100,6 +100,10 @@ main{overflow-y:auto;padding:var(--pico-spacing)}
 
 /* --- 审批弹窗 --- */
 .sw-approval-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px}
+.sw-dl-wrap{position:relative;display:inline-flex}
+.sw-dl-menu{position:absolute;right:0;top:110%;display:none;flex-direction:column;min-width:180px;background:var(--card);border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow);z-index:1300;padding:4px}
+.sw-dl-menu a{padding:6px 10px;font-size:12px;color:var(--fg);text-decoration:none;border-radius:4px}
+.sw-dl-menu a:hover{background:var(--hover-accent)}
 .sw-approval-card{background:var(--card);color:var(--fg);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 12px 40px var(--shadow);padding:18px;width:440px;max-width:94vw}
 .sw-approval-card.sw-danger{border-color:var(--danger);box-shadow:0 12px 40px rgba(220,38,38,.25)}
 .sw-approval-args{max-height:180px;overflow:auto;white-space:pre-wrap;font-family:monospace;font-size:11px;background:var(--card-2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;color:var(--fg-soft)}
@@ -128,6 +132,15 @@ main{overflow-y:auto;padding:var(--pico-spacing)}
 <button class="btn btn-ghost btn-xs" onclick="A.showLogs()">Log</button>
 <button id="swThemeBtn" class="btn btn-ghost btn-xs" onclick="A.swToggleTheme()" title="切换深色/浅色主题">🌙</button>
 <button id="swGraphBtn" class="btn btn-ghost btn-xs" onclick="A.swShowGraph()" title="知识图谱">🕸 Graph</button>
+<div class="sw-dl-wrap">
+ <button id="swDlBtn" class="btn btn-primary btn-xs" onclick="A.swToggleDl()" title="下载桌面客户端 / Android App">⬇ 客户端</button>
+ <div id="swDlMenu" class="sw-dl-menu" style="display:none">
+  <a href="https://github.com/ProfYangShengXu/AI-wiki/releases/download/gray-0.12.0/studywiki-setup.exe" target="_blank" rel="noopener">Windows 一键安装包</a>
+  <a href="https://github.com/ProfYangShengXu/AI-wiki/releases/download/gray-0.12.0/client-windows.zip" target="_blank" rel="noopener">Windows 免安装版(zip)</a>
+  <a href="https://github.com/ProfYangShengXu/AI-wiki/releases/download/gray-0.12.0/studywiki-client-debug.apk" target="_blank" rel="noopener">Android App(APK)</a>
+  <a href="https://github.com/ProfYangShengXu/AI-wiki/releases/latest" target="_blank" rel="noopener">全部版本 →</a>
+ </div>
+</div>
 <input class="input input-sm" style="width:120px" placeholder="Search" onkeydown="if(event.key==='Enter')A.search()">
 </div>
 
@@ -210,6 +223,13 @@ main{overflow-y:auto;padding:var(--pico-spacing)}
 </div>
 <label for="bsBaseUrl">API Base URL</label>
 <input id="bsBaseUrl" type="text" autocomplete="off" placeholder="https://api.deepseek.com">
+<label for="bsModel">模型 (Model)</label>
+<select id="bsModel">
+<option value="deepseek-chat">deepseek-chat（通用）</option>
+<option value="deepseek-reasoner">deepseek-reasoner（推理）</option>
+<option value="gpt-4o-mini">gpt-4o-mini</option>
+<option value="gpt-4o">gpt-4o</option>
+</select>
 <div style="display:flex;gap:8px;margin-top:14px">
 <button class="btn btn-outline btn-sm" type="button" id="bsTestBtn" onclick="A.bsTestKey()" style="flex:1">测试连接</button>
 <button class="btn btn-primary btn-sm" type="button" id="bsSaveBtn" onclick="A.bsSaveKey()" style="flex:1">保存并进入</button>
@@ -234,10 +254,10 @@ async startApp(){await this.loadKB();await this.load();await this.wsConnect()},
 showBootstrap(){const m=$('bootstrapMask');if(m){m.style.display='flex';m.style.alignItems='center';m.style.justifyContent='center'}this.bsSetStatus('请填写 API Key 并完成验证',false)},
 hideBootstrap(){const m=$('bootstrapMask');if(m)m.style.display='none'},
 bsSetStatus(msg,isError){const s=$('bsStatus');if(!s)return;s.textContent=msg||'';s.className=isError?'error':((msg&&(msg.startsWith('连接成功')||msg.startsWith('配置成功')))?'ok':'')},
-bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const base=$('bsBaseUrl');if(base&&!base.value)base.value=p==='openai'?'https://api.openai.com/v1':'https://api.deepseek.com';return p},
+bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const base=$('bsBaseUrl');if(base&&!base.value)base.value=p==='openai'?'https://api.openai.com/v1':'https://api.deepseek.com';const m=$('bsModel');if(m){if(p==='openai')m.value='gpt-4o-mini';else m.value='deepseek-chat'};return p},
 bsProviderChanged(){this.bsApplyProvider();this.bsSetStatus('',false)},
 bsToggleKey(){const k=$('bsKey');if(!k)return;k.type=k.type==='password'?'text':'password'},
-bsPayload(){return{provider:this.bsApplyProvider(),api_key:$('bsKey').value.trim(),base_url:$('bsBaseUrl').value.trim()}},
+bsPayload(){return{provider:this.bsApplyProvider(),api_key:$('bsKey').value.trim(),base_url:$('bsBaseUrl').value.trim(),model:($('bsModel')?.value||'deepseek-chat').trim()}},
 bsBusy(busy){for(const id of['bsTestBtn','bsSaveBtn']){const b=$(id);if(b)b.disabled=busy}if($('bsKey'))$('bsKey').disabled=busy;if($('bsProvider'))$('bsProvider').disabled=busy;if($('bsBaseUrl'))$('bsBaseUrl').disabled=busy},
 async bsTestKey(){const p=this.bsPayload();if(!p.api_key){this.bsSetStatus('请先填写 API Key',true);return}this.bsBusy(true);this.bsSetStatus('正在验证 Key ...',false);try{const r=await fetch('/api/bootstrap/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const d=await r.json();if(d.status==='success'&&d.data?.ok){this.bsSetStatus('连接成功: '+d.data.key_tail,false)}else{this.bsSetStatus((d.message||d.detail||'验证失败')+(d.error_code?' ('+d.error_code+')':''),true)}}catch(e){this.bsSetStatus('网络错误: '+e.message,true)}finally{this.bsBusy(false)}},
 async bsSaveKey(){const p=this.bsPayload();if(!p.api_key){this.bsSetStatus('请先填写 API Key',true);return}this.bsBusy(true);this.bsSetStatus('正在验证并保存 ...',false);try{const r=await fetch('/api/bootstrap/configure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const d=await r.json();if(d.status==='success'&&d.data?.provider){this.bootstrap.required=false;this.bootstrap.status='configured';this.bsSetStatus('配置成功，正在进入 ...',false);this.hideBootstrap();this.bsBusy(false);await this.startApp()}else{this.bsSetStatus((d.message||d.detail||'保存失败')+(d.error_code?' ('+d.error_code+')':''),true);this.bsBusy(false)}}catch(e){this.bsSetStatus('网络错误: '+e.message,true);this.bsBusy(false)}},
@@ -348,6 +368,7 @@ show(id){const el=$(id);if(id==='lgPanel')el.style.display='flex';else el.style.
 swThemeInit(){let t=localStorage.getItem('sw-theme');if(!t){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'}this.swApplyTheme(t)},
 swApplyTheme(t){const dark=t==='dark';document.body.classList.toggle('dark',dark);document.documentElement.setAttribute('data-theme',dark?'dark':'light');const b=$('swThemeBtn');if(b)b.textContent=dark?'☀️':'🌙'},
 swToggleTheme(){const dark=!document.body.classList.contains('dark');localStorage.setItem('sw-theme',dark?'dark':'light');this.swApplyTheme(dark?'dark':'light')},
+swToggleDl(){const m=$('swDlMenu');if(!m)return;const show=m.style.display==='none';m.style.display=show?'flex':'none';if(show){setTimeout(()=>document.addEventListener('click',(e)=>{if(!$('swDlBtn').contains(e.target)&&!m.contains(e.target))m.style.display='none'},{once:true}),0)}},
 
 // ── WebSocket 事件分发 ──────────────────────────────
 swSend(obj){if(this.ws&&this.ws.readyState===WebSocket.OPEN){try{this.ws.send(JSON.stringify(obj))}catch(e){}}},
