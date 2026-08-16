@@ -21,6 +21,7 @@ def client():
 def isolated_env(tmp_path, monkeypatch):
     """隔离 .env 路径与配置值，避免污染真实环境。"""
     monkeypatch.setattr(config, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(config, "ENV_FILE", tmp_path / ".env")
     monkeypatch.setattr(config, "LLM_PROVIDER", "deepseek")
     monkeypatch.setattr(config, "DEEPSEEK_API_KEY", "")
     monkeypatch.setattr(config, "OPENAI_API_KEY", "")

@@ -127,9 +127,25 @@ class SidecarService {
       );
       _pid = _process!.pid;
       _startedByUs = true;
-      // 排空输出流,避免后端日志填满管道缓冲区
-      unawaited(_process!.stdout.drain<void>());
-      unawaited(_process!.stderr.drain<void>());
+      // 后端输出写入数据目录 logs/backend.log,便于定位端口冲突/崩溃
+      try {
+        final base =
+            Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path;
+        final logFile = File(
+          '$base${Platform.pathSeparator}StudyWiki-Agent'
+          '${Platform.pathSeparator}logs${Platform.pathSeparator}backend.log',
+        );
+        logFile.parent.createSync(recursive: true);
+        final sink = logFile.openWrite(mode: FileMode.append);
+        unawaited(_process!.stdout.pipe(sink).catchError((_) {}));
+        unawaited(
+          _process!.stderr.pipe(sink).catchError((_) {}).then((_) => sink.close()),
+        );
+      } catch (_) {
+        // 日志捕获失败则退回排空模式,不影响主流程
+        unawaited(_process!.stdout.drain<void>());
+        unawaited(_process!.stderr.drain<void>());
+      }
       unawaited(
         _process!.exitCode.then((_) {
           _process = null;

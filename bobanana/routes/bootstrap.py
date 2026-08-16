@@ -108,7 +108,7 @@ def _provider_base_url(provider: str) -> str:
 async def bootstrap_status():
     """返回灰屏状态。永不返回完整 API Key。"""
     provider = _current_provider()
-    required = _bootstrap_required(config.BASE_DIR / ".env")
+    required = _bootstrap_required(config.ENV_FILE)
     key_tail = _provider_key_tail(provider)
     return ApiResponse(
         status="success",
@@ -291,7 +291,7 @@ async def bootstrap_configure(payload: BootstrapConfigRequest):
     base_url = (payload.base_url or "").strip() or spec["default_base_url"]
     model = (payload.model or "").strip() or spec["default_model"]
 
-    env_path = config.BASE_DIR / ".env"
+    env_path = config.ENV_FILE
     _write_env_file(
         env_path,
         {
