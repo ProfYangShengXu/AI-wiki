@@ -118,6 +118,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: stage
+      - name: 下载 VC++ 运行库
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "stage\vc_redist.x64.exe"
       - name: 组装安装目录
         shell: pwsh
         run: |
@@ -132,7 +136,7 @@ jobs:
           @'
           [Setup]
           AppName=StudyWiki-Agent
-          AppVersion=0.6.0
+          AppVersion=0.9.0
           DefaultDirName={autopf}\StudyWiki-Agent
           DefaultGroupName=StudyWiki-Agent
           OutputDir=dist
@@ -148,6 +152,7 @@ jobs:
           [Files]
           Source: "stage\client\*"; DestDir: "{app}\client"; Flags: recursesubdirs ignoreversion
           Source: "stage\study-wiki-core.exe"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "stage\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
           [Icons]
           Name: "{autoprograms}\StudyWiki-Agent"; Filename: "{app}\client\studywiki_client.exe"
@@ -157,6 +162,7 @@ jobs:
           Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务:"
 
           [Run]
+          Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "安装 VC++ 运行库..."; Flags: waituntilterminated
           Filename: "{app}\client\studywiki_client.exe"; Description: "立即启动 StudyWiki-Agent"; Flags: nowait postinstall skipifsilent
           '@ | Set-Content -Encoding UTF8 installer.iss
       - name: 编译安装包
