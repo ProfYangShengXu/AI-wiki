@@ -98,19 +98,33 @@ def get_embedding_model():
             os.environ["HF_HUB_OFFLINE"] = "1"
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
             logger.info("加载内嵌嵌入模型: %s ...", model_ref)
+            try:
+                _embedding_model = SentenceTransformer(model_ref)
+            except Exception as e:
+                raise RuntimeError(
+                    f"内嵌嵌入模型加载失败({model_ref}): {e}"
+                ) from e
         else:
             model_ref = SENTENCE_TRANSFORMERS_MODEL
-            # 未打包模型:允许联网下载(首次约 90MB),失败给出明确错误
-            os.environ.pop("HF_HUB_OFFLINE", None)
-            os.environ.pop("TRANSFORMERS_OFFLINE", None)
-            logger.info("加载嵌入模型(缓存/联网): %s ...", model_ref)
-        try:
-            _embedding_model = SentenceTransformer(model_ref)
-        except Exception as e:
-            raise RuntimeError(
-                f"嵌入模型加载失败({model_ref}): {e}。"
-                "离线版需包含 vendor_model/ 目录;在线版请检查网络后重启。"
-            ) from e
+            # 先尝试离线缓存(速度快、测试环境必须);无缓存且非测试环境时联网下载
+            os.environ["HF_HUB_OFFLINE"] = "1"
+            os.environ["TRANSFORMERS_OFFLINE"] = "1"
+            logger.info("加载嵌入模型(本地缓存): %s ...", model_ref)
+            try:
+                _embedding_model = SentenceTransformer(model_ref)
+            except Exception:
+                if os.environ.get("STUDYWIKI_TEST_MODE") == "1":
+                    raise
+                logger.warning("本地缓存缺失,尝试联网下载(首次约 90MB) ...")
+                os.environ.pop("HF_HUB_OFFLINE", None)
+                os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                try:
+                    _embedding_model = SentenceTransformer(model_ref)
+                except Exception as e:
+                    raise RuntimeError(
+                        f"嵌入模型加载失败({model_ref}): {e}。"
+                        "请检查网络后重启,或使用包含 vendor_model/ 的安装包。"
+                    ) from e
         logger.info("嵌入模型就绪, 维度: %d", _embedding_model.get_embedding_dimension())
     else:
         # OpenAI embedding: 直接返回 None, 由 embed_text 处理
