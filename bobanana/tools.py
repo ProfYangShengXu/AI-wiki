@@ -77,6 +77,72 @@ def _bundled_embedding_ready() -> bool:
     ) and (_BUNDLED_EMBEDDING_DIR / "config.json").exists()
 
 
+def _resolve_cached_model_path(model_name: str) -> str | None:
+    """解析本地 HF 缓存快照路径,按本地目录加载以绕开 hub 网络检查。
+
+    sentence_transformers 即使设置 HF_HUB_OFFLINE=1 仍会对缺失的
+    adapter_config.json 发 HEAD 请求并重试 5 次,网络不可达时每次卡数十秒。
+    直接解析缓存目录可完全离线、秒级加载。
+    """
+    try:
+        cache_root = Path(
+            os.environ.get("HF_HOME")
+            or os.path.expanduser("~/.cache/huggingface/hub")
+        )
+        snap_dir = cache_root / ("models--" + model_name.replace("/", "--")) / "snapshots"
+        if not snap_dir.is_dir():
+            return None
+        for snap in sorted(snap_dir.iterdir(), reverse=True):
+            if snap.is_dir() and (snap / "config.json").exists():
+                return str(snap)
+    except Exception:
+        return None
+    return None
+
+
+def _block_hf_network() -> None:
+    """把 HF hub 端点指到本地黑洞,使任何 hub 请求立即失败(连接拒绝)。
+
+    sentence_transformers 加载时会无视离线标志做 adapter_config.json 的
+    HEAD 探测;在离线/受限网络环境,该探测的重试(指数退避 + 连接超时)
+    会把一次模型加载拖到数分钟。黑洞端点使其瞬间失败,离线源照常加载。
+    """
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    try:
+        import huggingface_hub.constants as _hub_constants
+        # ENDPOINT 与 URL 模板都是导入时拼接的常量,必须同时改,
+        # 否则文件 HEAD 仍会打到真实的 huggingface.co
+        _hub_constants.ENDPOINT = "http://127.0.0.1:9"
+        _hub_constants.HUGGINGFACE_CO_URL_TEMPLATE = (
+            "http://127.0.0.1:9/{repo_id}/resolve/{revision}/{filename}"
+        )
+    except Exception:  # noqa: BLE001 — 兜底: 失败也不影响加载
+        pass
+    try:
+        # 关闭 hub 请求的指数退避重试(默认 5 次,离线时每次白等数十秒)
+        import huggingface_hub.utils._http as _hh
+        if not getattr(_hh, "_studywiki_patched", False):
+            _orig_backoff = _hh.http_backoff
+
+            def _no_retry(*args, **kwargs):
+                kwargs["max_retries"] = 0
+                kwargs["base_wait_time"] = 0
+                kwargs["max_wait_time"] = 0
+                return _orig_backoff(*args, **kwargs)
+
+            _hh.http_backoff = _no_retry
+            _hh._studywiki_patched = True
+            try:
+                import huggingface_hub.hf_api as _hfa
+                if _hfa.http_backoff is _orig_backoff:
+                    _hfa.http_backoff = _no_retry
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception:  # noqa: BLE001 — 兜底: 失败也不影响加载
+        pass
+
+
 def get_embedding_model():
     """懒加载嵌入模型。
 
@@ -93,6 +159,8 @@ def get_embedding_model():
 
     if EMBEDDING_PROVIDER == "sentence-transformers":
         from sentence_transformers import SentenceTransformer
+        # 统一在网络黑洞下加载: 本地/内嵌模型不受影响,任何 hub 探测立即失败
+        _block_hf_network()
         if _bundled_embedding_ready():
             model_ref = str(_BUNDLED_EMBEDDING_DIR)
             os.environ["HF_HUB_OFFLINE"] = "1"
@@ -106,25 +174,35 @@ def get_embedding_model():
                 ) from e
         else:
             model_ref = SENTENCE_TRANSFORMERS_MODEL
-            # 先尝试离线缓存(速度快、测试环境必须);无缓存且非测试环境时联网下载
             os.environ["HF_HUB_OFFLINE"] = "1"
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
-            logger.info("加载嵌入模型(本地缓存): %s ...", model_ref)
-            try:
-                _embedding_model = SentenceTransformer(model_ref)
-            except Exception:
-                if os.environ.get("STUDYWIKI_TEST_MODE") == "1":
-                    raise
-                logger.warning("本地缓存缺失,尝试联网下载(首次约 90MB) ...")
-                os.environ.pop("HF_HUB_OFFLINE", None)
-                os.environ.pop("TRANSFORMERS_OFFLINE", None)
+            # 优先解析本地缓存目录直接加载(绕开 hub 网络重试,秒级)
+            cached_path = _resolve_cached_model_path(model_ref)
+            if cached_path:
+                logger.info("加载嵌入模型(本地缓存 %s) ...", cached_path)
                 try:
-                    _embedding_model = SentenceTransformer(model_ref)
+                    _embedding_model = SentenceTransformer(cached_path)
                 except Exception as e:
                     raise RuntimeError(
-                        f"嵌入模型加载失败({model_ref}): {e}。"
-                        "请检查网络后重启,或使用包含 vendor_model/ 的安装包。"
+                        f"嵌入模型加载失败({cached_path}): {e}"
                     ) from e
+            else:
+                logger.info("本地缓存缺失,尝试标准加载(可能联网) ...")
+                try:
+                    _embedding_model = SentenceTransformer(model_ref)
+                except Exception:
+                    if os.environ.get("STUDYWIKI_TEST_MODE") == "1":
+                        raise
+                    logger.warning("缓存缺失,尝试联网下载(首次约 90MB) ...")
+                    os.environ.pop("HF_HUB_OFFLINE", None)
+                    os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                    try:
+                        _embedding_model = SentenceTransformer(model_ref)
+                    except Exception as e:
+                        raise RuntimeError(
+                            f"嵌入模型加载失败({model_ref}): {e}。"
+                            "请检查网络后重启,或使用包含 vendor_model/ 的安装包。"
+                        ) from e
         logger.info("嵌入模型就绪, 维度: %d", _embedding_model.get_embedding_dimension())
     else:
         # OpenAI embedding: 直接返回 None, 由 embed_text 处理
