@@ -124,11 +124,17 @@ class ApiClient {
     required String provider,
     required String apiKey,
     required String baseUrl,
+    String model = '',
   }) async {
     final data = await _dataOf(
       _dio.post<dynamic>(
         '/api/bootstrap/test',
-        data: {'provider': provider, 'api_key': apiKey, 'base_url': baseUrl},
+        data: {
+          'provider': provider,
+          'api_key': apiKey,
+          'base_url': baseUrl,
+          'model': model,
+        },
       ),
     );
     return BootstrapActionResult.fromJson(data);

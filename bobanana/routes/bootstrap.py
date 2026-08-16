@@ -122,27 +122,29 @@ async def bootstrap_status():
     )
 
 
-def _verify_api_key(provider: str, api_key: str, base_url: str) -> tuple[bool, str, str]:
+def _verify_api_key(
+    provider: str, api_key: str, base_url: str, model: str = "",
+) -> tuple[bool, str, str]:
     """用供应商轻量接口验证 Key。
 
-    返回 (ok, message, error_code)。先尝试 /models，失败再尝试 1 token 补全。
+    返回 (ok, message, error_code)。先尝试 /models,失败再尝试 1 token 补全。
     """
     base_url = (base_url or "").strip().rstrip("/") or PROVIDERS[provider]["default_base_url"]
     headers = {"Authorization": f"Bearer {api_key}"}
-    model = PROVIDERS[provider]["default_model"]
+    probe_model = (model or "").strip() or PROVIDERS[provider]["default_model"]
 
     try:
         with httpx.Client(timeout=6.0) as client:
             models_resp = client.get(f"{base_url}/models", headers=headers)
             if models_resp.status_code == 200:
-                return True, "连接成功", ""
+                return True, f"连接成功(模型 {probe_model})", ""
     except Exception:
         # /models 可能不存在或网络异常，继续走补全接口验证。
         pass
 
     try:
         payload = {
-            "model": model,
+            "model": probe_model,
             "messages": [{"role": "user", "content": "ping"}],
             "max_tokens": 1,
             "temperature": 0,
@@ -150,17 +152,24 @@ def _verify_api_key(provider: str, api_key: str, base_url: str) -> tuple[bool, s
         with httpx.Client(timeout=10.0) as client:
             resp = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
         if resp.status_code == 200:
-            return True, "连接成功", ""
+            return True, f"连接成功(模型 {probe_model})", ""
         if resp.status_code in (401, 403):
             return False, "API Key 无效或未授权，请检查后重试", "SW-BOOTSTRAP-401"
+        if resp.status_code == 402:
+            return False, "账户余额不足，请前往供应商控制台充值", "SW-BOOTSTRAP-429"
         if resp.status_code == 429:
             return False, "请求过于频繁或额度不足，请稍后重试", "SW-BOOTSTRAP-429"
-        return False, f"模型服务返回异常状态码 {resp.status_code}", "SW-BOOTSTRAP-UPSTREAM"
+        body_snippet = (resp.text or "")[:200].replace("\n", " ")
+        return (
+            False,
+            f"模型服务返回异常状态码 {resp.status_code}: {body_snippet}",
+            "SW-BOOTSTRAP-UPSTREAM",
+        )
     except httpx.TimeoutException:
         return False, "验证超时，请检查网络或 API 地址", "SW-BOOTSTRAP-TIMEOUT"
     except httpx.HTTPError as exc:
         logger.warning("Bootstrap 验证网络错误: %s", exc.__class__.__name__)
-        return False, "无法连接模型服务，请检查网络或 API 地址", "SW-BOOTSTRAP-NETWORK"
+        return False, "无法连接模型服务，请检查网络/代理或 API 地址", "SW-BOOTSTRAP-NETWORK"
 
 
 @router.post("/test", response_model=ApiResponse)
@@ -171,7 +180,7 @@ async def bootstrap_test(payload: BootstrapConfigRequest):
     if api_key.lower() in _PLACEHOLDER_KEYS:
         raise HTTPException(status_code=400, detail="请填写有效的 API Key")
 
-    ok, message, error_code = _verify_api_key(provider, api_key, payload.base_url)
+    ok, message, error_code = _verify_api_key(provider, api_key, payload.base_url, payload.model)
     if not ok:
         return ApiResponse(
             status="error",
@@ -269,7 +278,7 @@ async def bootstrap_configure(payload: BootstrapConfigRequest):
     if api_key.lower() in _PLACEHOLDER_KEYS:
         raise HTTPException(status_code=400, detail="请填写有效的 API Key")
 
-    ok, message, error_code = _verify_api_key(provider, api_key, payload.base_url)
+    ok, message, error_code = _verify_api_key(provider, api_key, payload.base_url, payload.model)
     if not ok:
         return ApiResponse(
             status="error",

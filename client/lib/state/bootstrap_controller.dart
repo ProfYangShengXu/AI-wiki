@@ -92,6 +92,7 @@ class BootstrapController extends Notifier<BootstrapState> {
     required String provider,
     required String apiKey,
     required String baseUrl,
+    String model = '',
   }) async {
     state = state.copyWith(message: '正在验证 Key ...', isError: false);
     try {
@@ -99,6 +100,7 @@ class BootstrapController extends Notifier<BootstrapState> {
             provider: provider,
             apiKey: apiKey,
             baseUrl: baseUrl,
+            model: model,
           );
       state = state.copyWith(
         message: result.ok
@@ -118,6 +120,7 @@ class BootstrapController extends Notifier<BootstrapState> {
     required String provider,
     required String apiKey,
     required String baseUrl,
+    String model = '',
   }) async {
     state = state.copyWith(message: '正在验证并保存 ...', isError: false);
     try {
@@ -125,6 +128,7 @@ class BootstrapController extends Notifier<BootstrapState> {
             provider: provider,
             apiKey: apiKey,
             baseUrl: baseUrl,
+            model: model,
           );
       if (result.ok) {
         state = BootstrapState(

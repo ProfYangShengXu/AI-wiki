@@ -61,7 +61,7 @@ def test_test_endpoint_does_not_persist_key(client, isolated_env, monkeypatch):
     monkeypatch.setattr(
         bootstrap_route,
         "_verify_api_key",
-        lambda provider, api_key, base_url: (True, "连接成功", ""),
+        lambda provider, api_key, base_url, model="": (True, "连接成功", ""),
     )
 
     resp = client.post(
@@ -85,7 +85,7 @@ def test_configure_rejects_invalid_key(client, isolated_env, monkeypatch):
     monkeypatch.setattr(
         bootstrap_route,
         "_verify_api_key",
-        lambda provider, api_key, base_url: (
+        lambda provider, api_key, base_url, model="": (
             False,
             "API Key 无效或未授权，请检查后重试",
             "SW-BOOTSTRAP-401",
@@ -111,7 +111,7 @@ def test_configure_writes_env_and_unlocks(client, isolated_env, monkeypatch):
     monkeypatch.setattr(
         bootstrap_route,
         "_verify_api_key",
-        lambda provider, api_key, base_url: (True, "连接成功", ""),
+        lambda provider, api_key, base_url, model="": (True, "连接成功", ""),
     )
 
     resp = client.post(
