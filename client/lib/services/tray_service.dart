@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'app_logger.dart';
 import 'sidecar_service.dart';
 
 /// Windows 系统托盘(微信/QQ 形态):
@@ -25,15 +25,47 @@ class TrayService {
   Future<void> init() async {
     if (!isWindows || _initialized) return;
     _initialized = true;
+    AppLogger.log('TrayService.init 开始');
+
     try {
       await windowManager.ensureInitialized();
-      await windowManager.setPreventClose(true);
-      windowManager.setSkipTaskbar(false);
-      windowManager.addListener(_WindowListener());
-      trayManager.addListener(TrayClickListener());
+      AppLogger.log('windowManager.ensureInitialized OK');
+    } catch (e) {
+      AppLogger.log('windowManager.ensureInitialized 失败: $e');
+      return;
+    }
 
+    // 逐步骤守卫:任何一步失败都不影响窗口显示
+    try {
+      await windowManager.setPreventClose(true);
+    } catch (e) {
+      AppLogger.log('setPreventClose 失败: $e');
+    }
+    try {
+      await windowManager.setSkipTaskbar(false);
+    } catch (e) {
+      AppLogger.log('setSkipTaskbar 失败: $e');
+    }
+    try {
+      windowManager.addListener(_WindowListener());
+    } catch (e) {
+      AppLogger.log('addListener 失败: $e');
+    }
+    try {
+      trayManager.addListener(TrayClickListener());
+    } catch (e) {
+      AppLogger.log('tray addListener 失败: $e');
+    }
+
+    try {
       final iconPath = await _extractTrayIcon();
       await trayManager.setIcon(iconPath);
+      AppLogger.log('trayManager.setIcon OK');
+    } catch (e) {
+      AppLogger.log('trayManager.setIcon 失败: $e');
+      return; // 托盘创建失败也不影响主窗口
+    }
+    try {
       await trayManager.setToolTip('StudyWiki-Agent');
       await trayManager.setContextMenu(
         Menu(
@@ -44,10 +76,30 @@ class TrayService {
           ],
         ),
       );
+      AppLogger.log('托盘菜单设置 OK');
     } catch (e) {
-      // 托盘初始化失败不影响主流程
-      debugPrint('TrayService init failed: $e');
+      AppLogger.log('托盘菜单失败: $e');
     }
+  }
+
+  /// 强制显示主窗口(启动兜底:某些环境下窗口可能被隐藏/跑到屏幕外)。
+  Future<void> showWindow() async {
+    if (!isWindows) return;
+    try {
+      await windowManager.show();
+      await windowManager.focus();
+      AppLogger.log('showWindow 已调用');
+    } catch (e) {
+      AppLogger.log('showWindow 失败: $e');
+    }
+  }
+
+  Future<void> hideWindow() async {
+    if (!isWindows) return;
+    try {
+      await windowManager.hide();
+      AppLogger.log('窗口已隐藏到托盘');
+    } catch (_) {}
   }
 
   /// 从 assets 提取托盘图标到临时目录,返回绝对路径。
@@ -58,21 +110,6 @@ class TrayService {
     );
     await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
     return file.path;
-  }
-
-  Future<void> showWindow() async {
-    if (!isWindows) return;
-    try {
-      await windowManager.show();
-      await windowManager.focus();
-    } catch (_) {}
-  }
-
-  Future<void> hideWindow() async {
-    if (!isWindows) return;
-    try {
-      await windowManager.hide();
-    } catch (_) {}
   }
 
   Future<void> dispose() async {
@@ -89,6 +126,7 @@ class TrayService {
 class _WindowListener extends WindowListener {
   @override
   void onWindowClose() {
+    AppLogger.log('收到窗口关闭事件 → 隐藏到托盘');
     unawaited(TrayService.instance.hideWindow());
   }
 }
