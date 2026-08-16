@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from bobanana import config
-from bobanana.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 

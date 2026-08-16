@@ -39,10 +39,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
+      - name: 下载内嵌嵌入模型(all-MiniLM-L6-v2)
+        run: |
+          python -m pip install huggingface_hub
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('sentence-transformers/all-MiniLM-L6-v2', local_dir='vendor_model', allow_patterns=['*.json','*.txt','model.safetensors','modules/*','modules/**/*','tokenizer*'])"
       - name: Build study-wiki-core.exe
         run: >
           pyinstaller --onefile --name study-wiki-core
-          --add-data "static;static" --add-data "api;api"
+          --add-data "static;static" --add-data "api;api" --add-data "vendor_model;vendor_model"
           main.py
       - name: 代码签名(若配置了证书)
         if: env.CODE_SIGN_PFX_BASE64 != ''

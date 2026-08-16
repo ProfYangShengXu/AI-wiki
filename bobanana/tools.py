@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from bobanana.config import (
+    BASE_DIR,
     EMBEDDING_PROVIDER,
     OPENAI_EMBEDDING_MODEL,
     SENTENCE_TRANSFORMERS_MODEL,
@@ -64,11 +65,24 @@ def reset_llm_cache() -> None:
 _embedding_model = None
 _embedding_lock = threading.Lock()
 
+# 打包进安装包的内嵌嵌入模型目录(CI 在构建时下载 all-MiniLM-L6-v2 放入)。
+# 存在则完全离线加载;不存在则回退到 HF 缓存/联网下载。
+_BUNDLED_EMBEDDING_DIR = BASE_DIR / "vendor_model"
+
+
+def _bundled_embedding_ready() -> bool:
+    return (
+        (_BUNDLED_EMBEDDING_DIR / "model.safetensors").exists()
+        or (_BUNDLED_EMBEDDING_DIR / "pytorch_model.bin").exists()
+    ) and (_BUNDLED_EMBEDDING_DIR / "config.json").exists()
+
+
 def get_embedding_model():
-    # Force offline mode for HuggingFace (use local cache only)
-    os.environ["HF_HUB_OFFLINE"] = "1"
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
-    """懒加载嵌入模型。"""
+    """懒加载嵌入模型。
+
+    加载顺序: 内嵌模型目录(离线) → 本地 HF 缓存 → 联网下载。
+    仅在确定可用离线源时才强制 HF 离线模式,避免新机器上因无缓存而加载失败。
+    """
     global _embedding_model
     if _embedding_model is not None:
         return _embedding_model
@@ -79,8 +93,24 @@ def get_embedding_model():
 
     if EMBEDDING_PROVIDER == "sentence-transformers":
         from sentence_transformers import SentenceTransformer
-        logger.info("加载嵌入模型: %s ...", SENTENCE_TRANSFORMERS_MODEL)
-        _embedding_model = SentenceTransformer(SENTENCE_TRANSFORMERS_MODEL)
+        if _bundled_embedding_ready():
+            model_ref = str(_BUNDLED_EMBEDDING_DIR)
+            os.environ["HF_HUB_OFFLINE"] = "1"
+            os.environ["TRANSFORMERS_OFFLINE"] = "1"
+            logger.info("加载内嵌嵌入模型: %s ...", model_ref)
+        else:
+            model_ref = SENTENCE_TRANSFORMERS_MODEL
+            # 未打包模型:允许联网下载(首次约 90MB),失败给出明确错误
+            os.environ.pop("HF_HUB_OFFLINE", None)
+            os.environ.pop("TRANSFORMERS_OFFLINE", None)
+            logger.info("加载嵌入模型(缓存/联网): %s ...", model_ref)
+        try:
+            _embedding_model = SentenceTransformer(model_ref)
+        except Exception as e:
+            raise RuntimeError(
+                f"嵌入模型加载失败({model_ref}): {e}。"
+                "离线版需包含 vendor_model/ 目录;在线版请检查网络后重启。"
+            ) from e
         logger.info("嵌入模型就绪, 维度: %d", _embedding_model.get_embedding_dimension())
     else:
         # OpenAI embedding: 直接返回 None, 由 embed_text 处理

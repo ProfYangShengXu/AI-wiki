@@ -1,8 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 联网权限(所有构建变体,release 也需要) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
-        android:label="studywiki_client"
+        android:label="StudyWiki-Agent"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+        <!-- 灰测期允许明文 HTTP(局域网连本地服务);正式版应改 HTTPS 并移除 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
