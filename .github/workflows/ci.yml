@@ -100,7 +100,7 @@ jobs:
         # 附带 static/ 与 api/openapi.yaml 数据文件(Windows 用 ";" 分隔)。
         run: >
           pyinstaller --onefile --name study-wiki-core
-          --add-data "static;static" --add-data "api;api" --add-data "vendor_model;vendor_model"
+          --collect-all chromadb --add-data "static;static" --add-data "api;api" --add-data "vendor_model;vendor_model"
           main.py
       - name: Upload exe artifact
         uses: actions/upload-artifact@v4

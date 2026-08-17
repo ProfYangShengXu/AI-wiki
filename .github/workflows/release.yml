@@ -44,10 +44,34 @@ jobs:
           python -m pip install huggingface_hub
           python -c "from huggingface_hub import snapshot_download; snapshot_download('sentence-transformers/all-MiniLM-L6-v2', local_dir='vendor_model', allow_patterns=['*.json','*.txt','model.safetensors','modules/*','modules/**/*','tokenizer*'])"
       - name: Build study-wiki-core.exe
+        # --collect-all chromadb: chromadb 有运行时数据文件,漏了会导致
+        # 冻结后 import bobanana.app 直接失败(uvicorn 只报外层错误)。
         run: >
           pyinstaller --onefile --name study-wiki-core
+          --collect-all chromadb
           --add-data "static;static" --add-data "api;api" --add-data "vendor_model;vendor_model"
           main.py
+      - name: "冒烟运行后端(诊断: 捕获真实导入错误)"
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "backend-out.log"
+          $err = Join-Path $env:RUNNER_TEMP "backend-err.log"
+          $p = Start-Process -FilePath ".\dist\study-wiki-core.exe" -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          Start-Sleep -Seconds 30
+          if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
+          "----- STDOUT -----"
+          Get-Content $out -ErrorAction SilentlyContinue | Select-Object -Last 40
+          "----- STDERR -----"
+          Get-Content $err -ErrorAction SilentlyContinue | Select-Object -Last 60
+          if ($p.ExitCode -ne 0) { "SMOKE_FAIL exit=$($p.ExitCode)" }
+      - name: 上传后端冒烟诊断
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-smoke-logs
+          path: |
+            ${{ runner.temp }}/backend-out.log
+            ${{ runner.temp }}/backend-err.log
       - name: 代码签名(若配置了证书)
         if: env.CODE_SIGN_PFX_BASE64 != ''
         shell: pwsh

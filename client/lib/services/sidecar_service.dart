@@ -62,8 +62,10 @@ class SidecarService {
     final parentDir = exeFile.parent.parent.path;
     if (_customPath != null) candidates.add(_customPath!);
     candidates.add('$execDir${Platform.pathSeparator}study-wiki-core.exe'); // 便携 zip 同目录
+    candidates.add('$execDir${Platform.pathSeparator}study-wiki-core${Platform.pathSeparator}study-wiki-core.exe'); // 便携 onedir
     candidates.add('$execDir${Platform.pathSeparator}sidecar${Platform.pathSeparator}study-wiki-core.exe');
     candidates.add('$parentDir${Platform.pathSeparator}study-wiki-core.exe'); // 安装版上一级
+    candidates.add('$parentDir${Platform.pathSeparator}study-wiki-core${Platform.pathSeparator}study-wiki-core.exe'); // 安装版 onedir
     candidates.add('study-wiki-core.exe'); // CWD 兜底
     return candidates;
   }
