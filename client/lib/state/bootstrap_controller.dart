@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../services/app_logger.dart';
 
 class BootstrapState {
   const BootstrapState({
@@ -76,6 +77,7 @@ class BootstrapController extends Notifier<BootstrapState> {
           await Future<void>.delayed(const Duration(seconds: 3));
           continue;
         }
+        AppLogger.log('bootstrap 本地服务连接失败: ${_errorText(e)}');
         state = BootstrapState(
           isLoading: false,
           required: true,
@@ -109,8 +111,12 @@ class BootstrapController extends Notifier<BootstrapState> {
         isError: !result.ok,
         keyTail: result.keyTail,
       );
+      if (!result.ok) {
+        AppLogger.log('Key 验证失败: ${result.errorCode} ${result.message}');
+      }
       return result.ok;
     } catch (e) {
+      AppLogger.log('Key 验证异常: ${_errorText(e)}');
       state = state.copyWith(message: '验证失败: ${_errorText(e)}', isError: true);
       return false;
     }

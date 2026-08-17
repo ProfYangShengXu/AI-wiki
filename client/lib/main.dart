@@ -35,7 +35,11 @@ Future<void> main() async {
               });
             }
           });
-          unawaited(SidecarService.instance.ensureBackendRunning());
+          unawaited(
+            SidecarService.instance
+                .ensureBackendRunning()
+                .then((r) => AppLogger.log('sidecar: ${r.message}')),
+          );
           unawaited(
             TrayService.instance
                 .init()

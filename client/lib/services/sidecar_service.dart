@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_logger.dart';
+
 /// Windows sidecar 管理:自动拉起/健康检查/退出带停后端 exe。
 ///
 /// 定位顺序:
@@ -54,10 +56,14 @@ class SidecarService {
   Future<List<String>> candidatePaths() async {
     await loadCustomPath();
     final candidates = <String>[];
-    final execDir = File(Platform.resolvedExecutable).parent.path;
+    final exeFile = File(Platform.resolvedExecutable);
+    final execDir = exeFile.parent.path;
+    // 安装版布局: {app}\client\studywiki_client.exe + {app}\study-wiki-core.exe
+    final parentDir = exeFile.parent.parent.path;
     if (_customPath != null) candidates.add(_customPath!);
+    candidates.add('$execDir${Platform.pathSeparator}study-wiki-core.exe'); // 便携 zip 同目录
     candidates.add('$execDir${Platform.pathSeparator}sidecar${Platform.pathSeparator}study-wiki-core.exe');
-    candidates.add('$execDir${Platform.pathSeparator}study-wiki-core.exe');
+    candidates.add('$parentDir${Platform.pathSeparator}study-wiki-core.exe'); // 安装版上一级
     candidates.add('study-wiki-core.exe'); // CWD 兜底
     return candidates;
   }
@@ -100,8 +106,11 @@ class SidecarService {
     }
     final exe = await resolveSidecarExe();
     if (exe == null) {
+      final scanned = await candidatePaths();
+      AppLogger.log('sidecar 未找到,已扫描: ${scanned.join(" | ")}');
       return SidecarStartResult(false, false, '未找到 study-wiki-core.exe,请手动启动后端或在设置中指定路径');
     }
+    AppLogger.log('sidecar 定位成功: $exe');
     try {
       final exeFile = File(exe);
       final workingDir = exeFile.parent.path;
