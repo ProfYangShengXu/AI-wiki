@@ -46,7 +46,7 @@ def _get_llm_executor() -> _ExecutorProxy:
         with _llm_executor_lock:
             if _llm_executor is None:
                 _llm_executor = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=4, thread_name_prefix="study-wiki-llm"
+                    max_workers=8, thread_name_prefix="study-wiki-llm"
                 )
     return _ExecutorProxy(_llm_executor)
 def reset_llm_cache() -> None:

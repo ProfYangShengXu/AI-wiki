@@ -147,11 +147,11 @@ def _extract_range(pages: list, start: int, end: int, topic: str,
             return []
         try:
             combined = "\n\n---\n\n".join([
-                f"【第{p['page_num']}页】\n{p['text'][:1500]}"
+                f"【第{p['page_num']}页】\n{p['text'][:1200]}"
                 for p in page_objs
             ])
             system = SYSTEM_EXTRACT_AGGREGATED.format(topic=topic, start=start, end=end)
-            raw = _llm_invoke(system, combined, cancel_event=cancel_event)
+            raw = _llm_invoke(system, combined, timeout_sec=300, cancel_event=cancel_event)
             parsed = _parse_llm_json(raw)
             if not parsed:
                 logger.warning("聚合提取 [%d-%d] 解析失败: %s", start, end, raw[:100] if raw else "empty")
@@ -369,7 +369,7 @@ def run_import_workflow(
         skip = set(skip_ranges or ())
         total_ranges = len(scan_result.valid_ranges)
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=1) as pool:
             futures = {}
             for r_idx, (start, end, topic) in enumerate(scan_result.valid_ranges):
                 if is_cancelled():
