@@ -81,7 +81,7 @@
 `POST /test`、`POST /configure` 请求体（`BootstrapConfigRequest`）：
 
 ```json
-{ "provider":"deepseek", "api_key":"sk-...", "base_url":"https://api.deepseek.com", "model":"deepseek-chat" }
+{ "provider":"deepseek", "api_key":"sk-...", "base_url":"https://api.deepseek.com", "model":"deepseek-v4-flash" }
 ```
 
 失败时返回 `200` + `{ "status":"error", "error_code":"SW-BOOTSTRAP-401", ... }`；占位 Key 直接返回 `400`。

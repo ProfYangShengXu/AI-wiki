@@ -225,8 +225,8 @@ main{overflow-y:auto;padding:var(--pico-spacing)}
 <input id="bsBaseUrl" type="text" autocomplete="off" placeholder="https://api.deepseek.com">
 <label for="bsModel">模型 (Model)</label>
 <select id="bsModel">
-<option value="deepseek-chat">deepseek-chat（通用）</option>
-<option value="deepseek-reasoner">deepseek-reasoner（推理）</option>
+<option value="deepseek-v4-flash">deepseek-v4-flash（快/便宜）</option>
+<option value="deepseek-v4-pro">deepseek-v4-pro（强）</option>
 <option value="gpt-4o-mini">gpt-4o-mini</option>
 <option value="gpt-4o">gpt-4o</option>
 </select>
@@ -254,10 +254,10 @@ async startApp(){await this.loadKB();await this.load();await this.wsConnect()},
 showBootstrap(){const m=$('bootstrapMask');if(m){m.style.display='flex';m.style.alignItems='center';m.style.justifyContent='center'}this.bsSetStatus('请填写 API Key 并完成验证',false)},
 hideBootstrap(){const m=$('bootstrapMask');if(m)m.style.display='none'},
 bsSetStatus(msg,isError){const s=$('bsStatus');if(!s)return;s.textContent=msg||'';s.className=isError?'error':((msg&&(msg.startsWith('连接成功')||msg.startsWith('配置成功')))?'ok':'')},
-bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const base=$('bsBaseUrl');if(base&&!base.value)base.value=p==='openai'?'https://api.openai.com/v1':'https://api.deepseek.com';const m=$('bsModel');if(m){if(p==='openai')m.value='gpt-4o-mini';else m.value='deepseek-chat'};return p},
+bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const base=$('bsBaseUrl');if(base&&!base.value)base.value=p==='openai'?'https://api.openai.com/v1':'https://api.deepseek.com';const m=$('bsModel');if(m){if(p==='openai')m.value='gpt-4o-mini';else m.value='deepseek-v4-flash'};return p},
 bsProviderChanged(){this.bsApplyProvider();this.bsSetStatus('',false)},
 bsToggleKey(){const k=$('bsKey');if(!k)return;k.type=k.type==='password'?'text':'password'},
-bsPayload(){return{provider:this.bsApplyProvider(),api_key:$('bsKey').value.trim(),base_url:$('bsBaseUrl').value.trim(),model:($('bsModel')?.value||'deepseek-chat').trim()}},
+bsPayload(){return{provider:this.bsApplyProvider(),api_key:$('bsKey').value.trim(),base_url:$('bsBaseUrl').value.trim(),model:($('bsModel')?.value||'deepseek-v4-flash').trim()}},
 bsBusy(busy){for(const id of['bsTestBtn','bsSaveBtn']){const b=$(id);if(b)b.disabled=busy}if($('bsKey'))$('bsKey').disabled=busy;if($('bsProvider'))$('bsProvider').disabled=busy;if($('bsBaseUrl'))$('bsBaseUrl').disabled=busy},
 async bsTestKey(){const p=this.bsPayload();if(!p.api_key){this.bsSetStatus('请先填写 API Key',true);return}this.bsBusy(true);this.bsSetStatus('正在验证 Key ...',false);try{const r=await fetch('/api/bootstrap/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const d=await r.json();if(d.status==='success'&&d.data?.ok){this.bsSetStatus('连接成功: '+d.data.key_tail,false)}else{this.bsSetStatus((d.message||d.detail||'验证失败')+(d.error_code?' ('+d.error_code+')':''),true)}}catch(e){this.bsSetStatus('网络错误: '+e.message,true)}finally{this.bsBusy(false)}},
 async bsSaveKey(){const p=this.bsPayload();if(!p.api_key){this.bsSetStatus('请先填写 API Key',true);return}this.bsBusy(true);this.bsSetStatus('正在验证并保存 ...',false);try{const r=await fetch('/api/bootstrap/configure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const d=await r.json();if(d.status==='success'&&d.data?.provider){this.bootstrap.required=false;this.bootstrap.status='configured';this.bsSetStatus('配置成功，正在进入 ...',false);this.hideBootstrap();this.bsBusy(false);await this.startApp()}else{this.bsSetStatus((d.message||d.detail||'保存失败')+(d.error_code?' ('+d.error_code+')':''),true);this.bsBusy(false)}}catch(e){this.bsSetStatus('网络错误: '+e.message,true);this.bsBusy(false)}},

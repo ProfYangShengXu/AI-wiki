@@ -15,7 +15,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
   final _keyController = TextEditingController();
   final _baseUrlController = TextEditingController();
   String _provider = 'deepseek';
-  String _model = 'deepseek-chat';
+  String _model = 'deepseek-v4-flash';
   bool _obscureKey = true;
   bool _busy = false;
 
@@ -104,7 +104,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                                   _provider = value;
                                   _model = value == 'openai'
                                       ? 'gpt-4o-mini'
-                                      : 'deepseek-chat';
+                                      : 'deepseek-v4-flash';
                                   if (_baseUrlController.text.isEmpty) {
                                     _baseUrlController.text =
                                         value == 'openai'
@@ -142,12 +142,12 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                         value: _model,
                         items: const [
                           DropdownMenuItem(
-                            value: 'deepseek-chat',
-                            child: Text('deepseek-chat（通用）'),
+                            value: 'deepseek-v4-flash',
+                            child: Text('deepseek-v4-flash（快/便宜）'),
                           ),
                           DropdownMenuItem(
-                            value: 'deepseek-reasoner',
-                            child: Text('deepseek-reasoner（推理）'),
+                            value: 'deepseek-v4-pro',
+                            child: Text('deepseek-v4-pro（强）'),
                           ),
                           DropdownMenuItem(
                             value: 'gpt-4o-mini',
