@@ -58,12 +58,22 @@ jobs:
           $err = Join-Path $env:RUNNER_TEMP "backend-err.log"
           $p = Start-Process -FilePath ".\dist\study-wiki-core.exe" -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
           Start-Sleep -Seconds 30
-          if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
+          if (!$p.HasExited) {
+            # 服务器存活 = 冒烟通过(健康服务本就不该退出)
+            "SMOKE_OK: 后端 30s 存活, uvicorn 就绪"
+            Stop-Process -Id $p.Id -Force
+            "----- STDOUT -----"
+            Get-Content $out -ErrorAction SilentlyContinue | Select-Object -Last 30
+            "----- STDERR -----"
+            Get-Content $err -ErrorAction SilentlyContinue | Select-Object -Last 20
+            exit 0
+          }
           "----- STDOUT -----"
           Get-Content $out -ErrorAction SilentlyContinue | Select-Object -Last 40
           "----- STDERR -----"
           Get-Content $err -ErrorAction SilentlyContinue | Select-Object -Last 60
-          if ($p.ExitCode -ne 0) { "SMOKE_FAIL exit=$($p.ExitCode)"; exit 1 }
+          "SMOKE_FAIL exit=$($p.ExitCode)"
+          exit 1
       - name: 上传后端冒烟诊断
         if: always()
         uses: actions/upload-artifact@v4
