@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,7 +17,6 @@ class UploadPage extends ConsumerStatefulWidget {
 class _UploadPageState extends ConsumerState<UploadPage> {
   bool _busy = false;
   String _status = '选择 PDF / Word / Markdown / TXT 文件导入知识库';
-  String? _taskId;
   Map<String, dynamic>? _lastResult;
   String _progressText = '';
 
@@ -42,7 +40,6 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       final task = await api.uploadDocument(File(path));
       final taskId = task['task_id'] as String?;
       setState(() {
-        _taskId = taskId;
         _status = '上传成功，开始解析...';
       });
       if (taskId == null) {
