@@ -41,7 +41,9 @@ class BootstrapActionResult {
 
   factory BootstrapActionResult.fromJson(Map<String, dynamic> json) {
     return BootstrapActionResult(
-      ok: json['ok'] == true,
+      // configure 成功响应不含 ok 字段(以 provider 存在为成功标志),两者兼容
+      ok: json['ok'] == true ||
+          (json['provider'] is String && (json['provider'] as String).isNotEmpty),
       message: json['message'] as String? ?? '',
       keyTail: json['key_tail'] as String? ?? '',
       provider: json['provider'] as String? ?? '',

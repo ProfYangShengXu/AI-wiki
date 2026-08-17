@@ -63,7 +63,7 @@ jobs:
           Get-Content $out -ErrorAction SilentlyContinue | Select-Object -Last 40
           "----- STDERR -----"
           Get-Content $err -ErrorAction SilentlyContinue | Select-Object -Last 60
-          if ($p.ExitCode -ne 0) { "SMOKE_FAIL exit=$($p.ExitCode)" }
+          if ($p.ExitCode -ne 0) { "SMOKE_FAIL exit=$($p.ExitCode)"; exit 1 }
       - name: 上传后端冒烟诊断
         if: always()
         uses: actions/upload-artifact@v4

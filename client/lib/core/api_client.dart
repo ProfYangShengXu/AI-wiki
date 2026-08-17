@@ -267,6 +267,36 @@ class ApiClient {
     }
     return const <String, dynamic>{};
   }
+
+  /// 上传文档并返回任务信息 {task_id, filename, storage_name, size}。
+  Future<Map<String, dynamic>> uploadDocument(File file) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        file.path,
+        filename: file.uri.pathSegments.last,
+      ),
+    });
+    return _dataOf(
+      _dio.post<dynamic>(
+        '/api/upload',
+        data: form,
+        options: Options(
+          contentType: 'multipart/form-data',
+          sendTimeout: const Duration(seconds: 120),
+        ),
+      ),
+    );
+  }
+
+  /// 查询导入任务状态 {task_id, status, message, progress, result}。
+  Future<Map<String, dynamic>> uploadTaskStatus(String taskId) {
+    return _dataOf(_dio.get<dynamic>('/api/upload/status/$taskId'));
+  }
+
+  /// 取消导入任务。
+  Future<Map<String, dynamic>> cancelUploadTask(String taskId) {
+    return _dataOf(_dio.post<dynamic>('/api/upload/cancel/$taskId'));
+  }
 }
 
 /// 配对协议客户端封装（`POST /api/pair/verify {code, device_id}`）。

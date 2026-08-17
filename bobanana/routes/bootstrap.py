@@ -314,5 +314,5 @@ async def bootstrap_configure(payload: BootstrapConfigRequest):
     return ApiResponse(
         status="success",
         message="配置成功，正在进入 StudyWiki-Agent",
-        data={"provider": provider, "key_tail": _mask_key(api_key)},
+        data={"ok": True, "provider": provider, "key_tail": _mask_key(api_key)},
     )

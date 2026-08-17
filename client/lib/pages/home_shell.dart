@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'chat_page.dart';
 import 'quiz_page.dart';
 import 'settings_page.dart';
+import 'upload_page.dart';
 import 'wiki_page.dart';
 
 class HomeShell extends StatefulWidget {
@@ -15,10 +16,11 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  static const _titles = ['知识库', '对话', 'Quiz', '设置'];
+  static const _titles = ['知识库', '对话', '导入', 'Quiz', '设置'];
   static const _pages = [
     WikiPage(),
     ChatPage(),
+    UploadPage(),
     QuizPage(),
     SettingsPage(),
   ];
@@ -48,6 +50,11 @@ class _HomeShellState extends State<HomeShell> {
                       icon: Icon(Icons.chat_bubble_outline),
                       selectedIcon: Icon(Icons.chat_bubble),
                       label: Text('对话'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.upload_outlined),
+                      selectedIcon: Icon(Icons.upload),
+                      label: Text('导入'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.quiz_outlined),
@@ -83,6 +90,10 @@ class _HomeShellState extends State<HomeShell> {
               NavigationDestination(
                 icon: Icon(Icons.chat_bubble_outline),
                 label: '对话',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.upload_outlined),
+                label: '导入',
               ),
               NavigationDestination(
                 icon: Icon(Icons.quiz_outlined),

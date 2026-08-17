@@ -42,8 +42,13 @@ def main():
   └──────────────────────────────────────┘
     """)
 
+    # 直接导入 app 对象,避免 uvicorn 的字符串导入在 PyInstaller 冻结环境下
+    # 报 "Could not import module bobanana.app" 且吞掉内部 traceback。
+    # 若 bobanana.app 导入失败,异常会带完整堆栈直接抛出,便于诊断打包缺失。
+    from bobanana.app import app
+
     uvicorn.run(
-        "bobanana.app:app",
+        app if not args.reload else "bobanana.app:app",
         host=args.host,
         port=args.port,
         reload=args.reload,
