@@ -67,26 +67,29 @@ async def test_list_cards_empty():
 @pytest.mark.asyncio
 async def test_list_cards_with_data():
     """列表含分页。"""
+    from bobanana.agent import CANONICAL_CATEGORIES
     for i in range(5):
-        await card_service.create_card(CardCreate(title=f"卡片{i}", category="A" if i % 2 == 0 else "B"))
+        cat = CANONICAL_CATEGORIES[i % 2]
+        await card_service.create_card(CardCreate(title=f"卡片{i}", category=cat))
 
     cards, total = await card_service.list_cards(page=1, limit=3)
     assert total == 5
     assert len(cards) == 3
 
-    cards_a, total_a = await card_service.list_cards(category="A")
+    cards_a, total_a = await card_service.list_cards(category=CANONICAL_CATEGORIES[0])
     assert total_a == 3
 
 
 @pytest.mark.asyncio
 async def test_get_categories():
-    """分类聚合。"""
-    await card_service.create_card(CardCreate(title="A1", category="X"))
-    await card_service.create_card(CardCreate(title="B1", category="Y"))
-    await card_service.create_card(CardCreate(title="A2", category="X"))
+    """分类聚合 — 分类收敛: 非规范分类归入「通用」。"""
+    from bobanana.agent import CANONICAL_CATEGORIES
+    await card_service.create_card(CardCreate(title="A1", category=CANONICAL_CATEGORIES[0]))
+    await card_service.create_card(CardCreate(title="B1", category="X"))
+    await card_service.create_card(CardCreate(title="A2", category=CANONICAL_CATEGORIES[0]))
 
     cats = await card_service.get_categories()
-    assert sorted(cats) == ["X", "Y"]
+    assert sorted(cats) == sorted([CANONICAL_CATEGORIES[0], "通用"])
 
 
 @pytest.mark.asyncio
