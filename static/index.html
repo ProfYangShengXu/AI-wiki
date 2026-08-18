@@ -241,6 +241,7 @@ main{overflow-y:auto;padding:var(--pico-spacing)}
 
 </div>
 
+<script src="/static/vendor/marked.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -275,7 +276,7 @@ if(d.status!=='success')return;
 this.cats={};this.aliases={};const raw={};
 for(const c of d.data.categories||[]){
 let cc=0,clist=[];
-try{const r2=await fetch('/api/cards?category='+encodeURIComponent(c)+'&limit=500');const d2=await r2.json();
+try{const r2=await fetch('/api/cards?category='+encodeURIComponent(c)+'&limit=500&sort=source');const d2=await r2.json();
 if(d2.data?.cards){cc=d2.data.cards.length;clist=d2.data.cards;
 for(const ca of d2.data.cards){for(const n of[ca.title,...(ca.aliases||[])]){if(n&&n.length>=2)this.aliases[n]=ca.id}}}}catch(e){}
 this.cats[c]={count:cc,cards:clist};
@@ -357,7 +358,8 @@ async newCard(){const t=prompt('Title:');if(!t)return;const c=prompt('Category:'
 async wsConnect(){if(this.ws&&this.ws.readyState===WebSocket.OPEN)return;try{this.ws=new WebSocket('ws://'+location.host+'/ws/chat');this.ws.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch(err){return}A.swHandleWS(d)};this.ws.onclose=()=>this.ws=null}catch(e){}},
 scrollChat(){const cm=$('chatMsgs');if(cm)cm.scrollTop=cm.scrollHeight},
 addMsg(user,text){return this.addMsgEl(user,text)},
-addMsgEl(user,text){const div=document.createElement('div');div.style.cssText='display:flex;'+(user?'justify-content:flex-end':'justify-content:flex-start')+';margin:2px 0';const bubble=document.createElement('div');bubble.style.cssText='font-size:12px;padding:4px 8px;border-radius:8px;background:'+(user?'var(--bubble-user)':'var(--bubble-ai)')+';color:'+(user?'#fff':'var(--bubble-ai-fg)')+';max-width:80%;white-space:pre-wrap;word-break:break-word';if(text!=null&&text!==''){if(text.indexOf('<div class="spinner"')===0)bubble.innerHTML=text;else bubble.textContent=text}div.appendChild(bubble);$('chatMsgs').appendChild(div);this.scrollChat();return bubble},
+renderChatMd(text){if(text==null)return'';let h;try{h=(typeof marked!=='undefined'&&marked.parse)?marked.parse(text):esc(text)}catch(e){h=esc(text)}const names=Object.entries(this.aliases).sort((a,b)=>b[0].length-a[0].length);for(const[n,id]of names){if(!n||n.length<2)continue;const re=new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');h=h.replace(re,m=>'<a href="#" class="card-link" onclick="A.oc(\''+esc(id)+'\');return false">'+m+'</a>')}return h},
+addMsgEl(user,text){const div=document.createElement('div');div.style.cssText='display:flex;'+(user?'justify-content:flex-end':'justify-content:flex-start')+';margin:2px 0';const bubble=document.createElement('div');bubble.style.cssText='font-size:12px;padding:4px 8px;border-radius:8px;background:'+(user?'var(--bubble-user)':'var(--bubble-ai)')+';color:'+(user?'#fff':'var(--bubble-ai-fg)')+';max-width:80%;word-break:break-word';if(text!=null&&text!==''){if(text.indexOf('<div class="spinner"')===0)bubble.innerHTML=text;else if(user)bubble.textContent=text;else bubble.innerHTML=this.renderChatMd(text)}div.appendChild(bubble);$('chatMsgs').appendChild(div);this.scrollChat();return bubble},
 chatSend(){const t=$('chatMsgInput').value.trim();if(!t)return;$('chatMsgInput').value='';this.addMsg(true,t);this.swStreamBegin();if(!this.ws||this.ws.readyState!==WebSocket.OPEN){this.wsConnect();return}this.swSend({type:'message',content:t,data:{mode:this.mode}})},
 setMode(m){this.mode=m;$('btnAsk').style.background=m==='ask'?'var(--accent)':'var(--card)';$('btnAsk').style.color=m==='ask'?'#fff':'var(--fg)';$('btnAgent').style.background=m==='agent'?'var(--accent)':'var(--card)';$('btnAgent').style.color=m==='agent'?'#fff':'var(--fg)'},
 toggleChat(){const p=$('chatPanel');const hidden=p.style.display==='none';p.style.display=hidden?'':'none';$('chatArrow').textContent=hidden?'-':'+'},
@@ -389,7 +391,7 @@ default:break;
 }},
 swStreamBegin(){if(this._stream)this.swStreamFinal(null);const el=this.addMsgEl(false,'');el.innerHTML='<div class="spinner" style="margin:2px auto"></div><div style="text-align:center;font-size:11px;color:var(--muted)">Thinking...</div>';this._stream={el,acc:''}},
 swStreamAppend(delta){if(delta==null||delta==='')return;if(!this._stream)this.swStreamBegin();const s=this._stream;if(s.acc===''){s.el.textContent=''}s.acc+=delta;s.el.textContent=s.acc;this.scrollChat()},
-swStreamFinal(text){if(this._stream){this._stream.el.textContent=(text!=null&&text!=='')?text:(this._stream.acc||'');this._stream=null;this.scrollChat()}else if(text!=null&&text!==''){this.addMsg(false,text)}},
+swStreamFinal(text){if(this._stream){const finalText=(text!=null&&text!=='')?text:(this._stream.acc||'');this._stream.el.innerHTML=this.renderChatMd(finalText);this._stream=null;this.scrollChat()}else if(text!=null&&text!==''){this.addMsg(false,text)}},
 swStatusLine(msg){const cm=$('chatMsgs');if(!cm)return;const div=document.createElement('div');div.style.cssText='text-align:center;font-size:11px;color:var(--muted);margin:2px 0';div.textContent=msg||'';cm.appendChild(div);this.scrollChat()},
 swStepAdd(tool,args){const cm=$('chatMsgs');const wrap=document.createElement('div');wrap.className='sw-step';const details=document.createElement('details');const summary=document.createElement('summary');const title=document.createElement('span');title.textContent='🔧 '+tool;const status=document.createElement('span');status.className='sw-step-status';status.innerHTML='<span class="spinner" style="width:10px;height:10px;border-width:1px"></span>';summary.appendChild(title);summary.appendChild(status);const body=document.createElement('div');body.className='sw-step-body';let argText='';try{argText=JSON.stringify(args,null,2)}catch(e){argText=String(args)}body.textContent=argText||'(无参数)';details.appendChild(summary);details.appendChild(body);wrap.appendChild(details);cm.appendChild(wrap);this.scrollChat();return{status,body}},
 swStepResult(step,ok,summary){if(!step)return;step.status.innerHTML='';step.status.textContent=ok?'✅ 完成':'⚠️ 失败';step.status.style.color=ok?'var(--ok)':'var(--danger)';if(summary){const s=document.createElement('div');s.style.cssText='margin-top:6px;color:var(--fg-soft);white-space:pre-wrap';s.textContent=summary;step.body.appendChild(s)}},
