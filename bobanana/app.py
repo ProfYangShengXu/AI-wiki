@@ -64,6 +64,13 @@ async def lifespan(app: FastAPI):
     await db_manager.startup()
     logger.info("数据库就绪 | 卡片总数: %d", db_manager.count())
 
+    # ── 存量分类收敛迁移 (幂等) ──────────────────────
+    try:
+        from bobanana.service.card_service import card_service
+        card_service.migrate_categories()
+    except Exception as e:
+        logger.warning("分类迁移失败(不影响启动): %s", e)
+
     # ── 预加载嵌入模型（启动时加载，避免在线程中加载导致 httpx 冲突）──
     from bobanana.config import EMBEDDING_PROVIDER
     if EMBEDDING_PROVIDER == "sentence-transformers":

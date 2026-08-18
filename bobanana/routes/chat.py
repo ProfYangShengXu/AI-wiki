@@ -28,6 +28,62 @@ _SEMANTIC_EVENT_TYPES = {
     "approval", "session.started", "session.done", "session.error", "progress",
 }
 
+# ── 上下文压缩 (前缀稳定, 保 LLM 前缀缓存命中率) ────────
+# 历史超过阈值时: 保留前 COMPRESS_PREFIX 条原文(缓存前缀, 逐 token 不变),
+# 中间用 LLM 压缩成一条摘要, 保留尾部 COMPRESS_TAIL 条原文。
+# 摘要固定插在「前缀之后、尾部之前」, 因此每次请求的 prompt 前缀完全一致,
+# 可命中 DeepSeek 等 provider 的前缀缓存; 压缩结果写回 SQLite 持久化。
+COMPRESS_THRESHOLD = 24
+COMPRESS_PREFIX = 6
+COMPRESS_TAIL = 8
+_SUMMARY_TAG = "【历史摘要】"
+
+_SYSTEM_COMPRESS = """你是一个对话压缩器。把下面这段多轮对话压缩成一段简洁的中文摘要：
+1. 保留用户的所有重要问题、已确认的结论、使用过的工具与导入的文件名
+2. 省略寒暄与重复内容
+3. 120 字以内，用第三人称陈述，不要使用"对话中"等元描述
+4. 只输出摘要正文，不要任何前后缀"""
+
+
+def _summarize_middle(middle: list[dict]) -> str:
+    """把中间历史用 LLM 压缩为摘要; 失败则退化为截断拼接。"""
+    from bobanana.tools import llm_invoke
+    text = "\n".join(
+        ("用户" if m.get("role") == "user" else "助手") + ": " + str(m.get("content", ""))
+        for m in middle
+    )
+    try:
+        summary = llm_invoke(_SYSTEM_COMPRESS, text, timeout_sec=15).strip()
+        if summary:
+            return summary[:500]
+    except Exception as e:
+        logger.warning("历史摘要生成失败, 退化为截断: %s", e)
+    # 退化: 拼接各条内容的前 60 字
+    parts = []
+    for m in middle:
+        c = str(m.get("content", "")).strip().replace("\n", " ")
+        parts.append(c[:60])
+    return "；".join(parts)[:500]
+
+
+def _maybe_compress(session_id: str, chat_history: list[dict]) -> list[dict]:
+    """超过阈值时压缩中间历史, 保持前缀稳定; 压缩结果落盘。"""
+    if len(chat_history) <= COMPRESS_THRESHOLD:
+        return chat_history
+    prefix = chat_history[:COMPRESS_PREFIX]
+    tail = chat_history[-COMPRESS_TAIL:]
+    middle = chat_history[COMPRESS_PREFIX:len(chat_history) - COMPRESS_TAIL]
+    if not middle:
+        return chat_history
+    summary = _summarize_middle(middle)
+    compressed = prefix + [{"role": "assistant", "content": f"{_SUMMARY_TAG}\n{summary}"}] + tail
+    memory.replace_history(session_id, compressed)
+    logger.info(
+        "会话 %s 上下文压缩: %d 条 → %d 条 (前缀 %d 条保持原文)",
+        session_id, len(chat_history), len(compressed), COMPRESS_PREFIX,
+    )
+    return compressed
+
 class ConnectionManager:
     """管理 WebSocket 连接和消息发送。"""
 
@@ -134,7 +190,8 @@ async def chat_websocket(websocket: WebSocket):
     # 会话记忆
     session_id = uuid.uuid4().hex
     memory.init_db()
-    chat_history: list[dict] = memory.get_history(session_id, limit=20)
+    chat_history: list[dict] = memory.get_history(session_id, limit=1000)
+    chat_history = _maybe_compress(session_id, chat_history)
 
     await _send_event(conn_id, {"type": "session.started", "session_id": session_id})
 
@@ -195,6 +252,7 @@ async def chat_websocket(websocket: WebSocket):
             # 记录对话历史
             chat_history.append({"role": "user", "content": user_content})
             memory.append_message(session_id, "user", user_content)
+            chat_history = _maybe_compress(session_id, chat_history)
 
             # 判断模式
             mode = msg.data.get("mode", "ask") if msg.data else "ask"
@@ -205,6 +263,7 @@ async def chat_websocket(websocket: WebSocket):
                 task = asyncio.create_task(_handle_agent(conn_id, user_content, chat_history))
 
                 def _finish(t: asyncio.Task):
+                    nonlocal chat_history
                     failed = False
                     try:
                         answer = t.result()
@@ -218,6 +277,7 @@ async def chat_websocket(websocket: WebSocket):
                         logger.error("Agent 失败: %s", e)
                     chat_history.append({"role": "assistant", "content": answer})
                     memory.append_message(session_id, "assistant", answer)
+                    chat_history = _maybe_compress(session_id, chat_history)
                     asyncio.ensure_future(manager.send(
                         conn_id, WSMessage(type="response", content=answer),
                     ))
@@ -260,6 +320,7 @@ async def chat_websocket(websocket: WebSocket):
             # 记录回答到历史并持久化
             chat_history.append({"role": "assistant", "content": answer})
             memory.append_message(session_id, "assistant", answer)
+            chat_history = _maybe_compress(session_id, chat_history)
 
             # 发送回答
             await manager.send(

@@ -306,7 +306,12 @@ class DatabaseManager:
 
     def list_cards(
         self, category: str | None = None, page: int = 1, limit: int = 50,
+        sort: str = "created",
     ) -> tuple[list[KnowledgeCard], int]:
+        """列出卡片, 支持排序:
+        - sort="created": 按创建时间正序 (ChromaDB 返回序, 兼容旧行为)
+        - sort="source":  按「文件导入时间 → 页码」排 (同一文件按页码连续排列)
+        """
         where = {"category": category} if category else None
         collection = self._require_collection()
         with self._lock:
@@ -314,8 +319,29 @@ class DatabaseManager:
         if not result or not result.get("ids"):
             return [], 0
         total = len(result["ids"])
+
+        if sort == "source":
+            # 每个 source_file 的导入时间 = 该文件最早卡片的 created_at
+            cards = [_to_card(result, i) for i in range(total)]
+            file_order: dict[str, str] = {}
+            for c in cards:
+                if c.source_file and (
+                    c.source_file not in file_order
+                    or c.created_at < file_order[c.source_file]
+                ):
+                    file_order[c.source_file] = c.created_at
+            cards.sort(
+                key=lambda c: (
+                    file_order.get(c.source_file, ""),
+                    c.source_page or 0,
+                    c.created_at,
+                )
+            )
+        else:
+            cards = [_to_card(result, i) for i in range(total)]
+
         start, end = (page-1)*limit, min(page*limit, total)
-        return [_to_card(result, i) for i in range(start, end)], total
+        return cards[start:end], total
 
     def search_cards(
         self, query_embedding: list[float], top_k: int = 10,

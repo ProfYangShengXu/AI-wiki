@@ -73,12 +73,23 @@ class TestCardsAPI:
 
 class TestCategoriesAPI:
     def test_categories(self):
+        # 分类收敛: 任意分类入库前归一化到固定分类表
+        from bobanana.agent import CANONICAL_CATEGORIES
         client.post("/api/cards", json={
             "title": "测试分类", "content": "test", "category": "测试分类A",
         })
         resp = client.get("/api/categories")
         assert resp.status_code == 200
-        assert "测试分类A" in resp.json()["data"]["categories"]
+        cats = resp.json()["data"]["categories"]
+        # 非规范分类被归入"通用"
+        assert "测试分类A" not in cats
+        assert "通用" in cats
+        # 规范分类直接可用
+        client.post("/api/cards", json={
+            "title": "测试分类2", "content": "test2", "category": CANONICAL_CATEGORIES[0],
+        })
+        resp = client.get("/api/categories")
+        assert CANONICAL_CATEGORIES[0] in resp.json()["data"]["categories"]
 
 
 class TestUploadAPI:

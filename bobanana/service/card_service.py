@@ -40,9 +40,10 @@ class CardService:
         return db_manager.get_card(card_id)
 
     async def list_cards(
-        self, category: str | None = None, page: int = 1, limit: int = 50
+        self, category: str | None = None, page: int = 1, limit: int = 50,
+        sort: str = "created",
     ) -> tuple[list[KnowledgeCard], int]:
-        return db_manager.list_cards(category, page, limit)
+        return db_manager.list_cards(category, page, limit, sort=sort)
 
     async def search_cards(
         self, query: str, top_k: int = RETRIEVAL_TOP_K
@@ -69,13 +70,16 @@ class CardService:
             content=data.content,
             examples=data.examples or [],
             questions=data.questions or [],
-            category=data.category or "未分类",
+            category=data.category or "通用",
             source_file=data.source_file or "",
             source_page=data.source_page or 0,
             related_cards=data.related_cards or [],
             created_at=now,
             updated_at=now,
         )
+        # 分类收敛: 入库前归一化到固定分类表
+        from bobanana.agent import normalize_category
+        card.category = normalize_category(card.category)
         # 锁外计算 embedding
         embedding = self._compute_embedding(card.embedding_text())
 
@@ -95,6 +99,9 @@ class CardService:
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(existing, field, value)
+        if "category" in update_data:
+            from bobanana.agent import normalize_category
+            existing.category = normalize_category(existing.category)
         existing.updated_at = datetime.now(UTC).isoformat()
 
         # 锁外计算 embedding
@@ -118,6 +125,7 @@ class CardService:
 
     async def batch_import(self, cards: list[CardCreate]) -> ImportResult:
         """批量导入 — 逐条独立事务，失败不影响已写入。"""
+        from bobanana.agent import normalize_category
         # 锁外预计算所有 embedding
         prepared = []
         for data in cards:
@@ -129,7 +137,7 @@ class CardService:
                 content=data.content,
                 examples=data.examples or [],
                 questions=data.questions or [],
-                category=data.category or "未分类",
+                category=normalize_category(data.category or "未分类"),
                 source_file=data.source_file or "",
                 source_page=data.source_page or 0,
                 related_cards=data.related_cards or [],
@@ -206,9 +214,9 @@ class CardService:
         """同步版批量导入。"""
         return asyncio.run(self.batch_import(cards))
 
-    def list_cards_sync(self, category=None, page=1, limit=5000):
+    def list_cards_sync(self, category=None, page=1, limit=5000, sort="created"):
         """同步版列出卡片。"""
-        return db_manager.list_cards(category, page, limit)
+        return db_manager.list_cards(category, page, limit, sort=sort)
 
     def get_card_sync(self, card_id: str):
         return db_manager.get_card(card_id)
@@ -218,6 +226,9 @@ class CardService:
         if not card: return None
         for f, v in data.model_dump(exclude_unset=True).items():
             setattr(card, f, v)
+        if hasattr(data, "category") and data.model_dump(exclude_unset=True).get("category") is not None:
+            from bobanana.agent import normalize_category
+            card.category = normalize_category(card.category)
         embedding = self._compute_embedding(card.embedding_text())
         db_manager.update_card(card_id, card, embedding)
         return card
@@ -229,6 +240,37 @@ class CardService:
 
     def get_categories_sync(self):
         return db_manager.get_categories()
+
+    def migrate_categories(self) -> int:
+        """存量卡片分类收敛迁移 — 把历史分类归一化到固定表。
+
+        幂等: 已是规范分类的卡片跳过; 返回实际迁移的卡片数。
+        """
+        from bobanana.agent import CANONICAL_CATEGORIES, normalize_category
+        from bobanana.database import db_manager as _db
+        collection = _db._require_collection()
+        with _db._lock:
+            result = collection.get()
+        migrated = 0
+        if not result or not result.get("ids"):
+            return 0
+        for i, cid in enumerate(result["ids"]):
+            m = (result.get("metadatas") or [None] * len(result["ids"]))[i]
+            if not m:
+                continue
+            raw = m.get("category") or "通用"
+            if raw in CANONICAL_CATEGORIES:
+                continue
+            canonical = normalize_category(raw)
+            if canonical == raw:
+                continue
+            m["category"] = canonical
+            with _db._lock:
+                collection.update(ids=[cid], metadatas=[m])
+            migrated += 1
+        if migrated:
+            logger.info("分类迁移完成: %d 张卡片归一化到固定分类表", migrated)
+        return migrated
 
     def search_cards_sync(self, query: str, top_k: int = RETRIEVAL_TOP_K, **filters) -> list:
         """同步版搜索 — 混合检索(BM25 + 向量余弦 + RRF 融合)。

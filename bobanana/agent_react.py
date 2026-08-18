@@ -210,6 +210,22 @@ def _build_tools_desc() -> str:
     return "\n".join(lines)
 
 
+def _history_to_text(chat_history: list[dict] | None) -> str:
+    """把会话历史渲染为文本。
+
+    历史已在 chat 路由层压缩(前缀原文 + 【历史摘要】 + 尾部原文),
+    这里按序全量渲染, 保证每次请求的 prompt 前缀逐 token 一致,
+    从而命中 LLM 前缀缓存。
+    """
+    if not chat_history:
+        return ""
+    lines = []
+    for m in chat_history:
+        role = "用户" if m.get("role") == "user" else "助手"
+        lines.append(f"{role}: {m.get('content', '')}")
+    return "\n".join(lines)
+
+
 def run_ask_mode(question: str, chat_history: list[dict] = None, stream_cb: Callable = None) -> str:
     """Ask 模式 — 仅查知识库回答。"""
     # Step 1: 搜索知识库
@@ -224,10 +240,7 @@ def run_ask_mode(question: str, chat_history: list[dict] = None, stream_cb: Call
     except Exception:
         pass
 
-    history_text = ""
-    for m in (chat_history or [])[-4:]:
-        role = "用户" if m.get("role") == "user" else "助手"
-        history_text += f"{role}: {m.get('content', '')}\n"
+    history_text = _history_to_text(chat_history)
 
     prompt = f"""对话历史:
 {history_text}
@@ -347,10 +360,7 @@ def run_agent_mode(
     tools_desc = _build_tools_desc()
     system = SYSTEM_AGENT.format(tools_desc=tools_desc)
 
-    history_text = ""
-    for m in (chat_history or [])[-4:]:
-        role = "用户" if m.get("role") == "user" else "助手"
-        history_text += f"{role}: {m.get('content', '')}\n"
+    history_text = _history_to_text(chat_history)
 
     conversation = f"""对话历史:
 {history_text}

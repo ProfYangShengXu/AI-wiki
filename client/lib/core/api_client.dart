@@ -175,6 +175,7 @@ class ApiClient {
     String? category,
     int page = 1,
     int limit = 200,
+    String sort = 'created',
   }) async {
     final data = await _dataOf(
       _dio.get<dynamic>(
@@ -183,6 +184,7 @@ class ApiClient {
           if (category != null && category.isNotEmpty) 'category': category,
           'page': page,
           'limit': limit,
+          'sort': sort,
         },
       ),
     );
@@ -192,6 +194,28 @@ class ApiClient {
   Future<KnowledgeCard?> getCard(String cardId) async {
     final data = await _dataOf(_dio.get<dynamic>('/api/cards/$cardId'));
     return KnowledgeCard.fromJson(data);
+  }
+
+  /// 手动创建卡片。
+  Future<KnowledgeCard> createCard(Map<String, dynamic> payload) async {
+    final data = await _dataOf(_dio.post<dynamic>('/api/cards', data: payload));
+    return KnowledgeCard.fromJson(data);
+  }
+
+  /// 手动更新卡片。
+  Future<KnowledgeCard> updateCard(
+    String cardId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _dataOf(
+      _dio.put<dynamic>('/api/cards/$cardId', data: payload),
+    );
+    return KnowledgeCard.fromJson(data);
+  }
+
+  /// 删除卡片。
+  Future<void> deleteCard(String cardId) async {
+    await _dataOf(_dio.delete<dynamic>('/api/cards/$cardId'));
   }
 
   Future<List<KnowledgeCard>> searchCards(String query) async {

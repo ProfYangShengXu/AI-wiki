@@ -81,8 +81,9 @@ async def list_cards(
     category: str | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=1000),
+    sort: str = Query("created", pattern="^(created|source)$"),
 ):
-    cards, total = await card_service.list_cards(category, page, limit)
+    cards, total = await card_service.list_cards(category, page, limit, sort=sort)
     return ApiResponse(
         status="success",
         data=CardListResponse(

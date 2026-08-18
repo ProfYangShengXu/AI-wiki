@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../state/refresh.dart';
 
 /// 文档导入页: 选择文件 → 上传 → 实时轮询任务进度 → 展示结果。
 class UploadPage extends ConsumerStatefulWidget {
@@ -71,6 +72,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         });
         if (status == 'done' || status == 'failed' || status == 'cancelled') {
           setState(() => _lastResult = st);
+          // 导入完成/失败后通知知识库列表刷新
+          ref.read(dataRefreshProvider.notifier).state++;
           return;
         }
       } catch (_) {

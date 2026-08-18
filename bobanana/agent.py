@@ -29,44 +29,91 @@ def _llm_invoke(system_prompt: str, user_prompt: str, timeout_sec: int | None = 
             return ""
     return llm_invoke(system_prompt, user_prompt, timeout_sec=timeout_sec)
 
-# ── Prompt ──────────────────────────────────────────────
-SYSTEM_EXTRACT = """你是一个知识提取专家，擅长帮助学生理解和记忆。从课件内容中提取知识点，JSON 数组格式。
+# ── 固定分类体系 ────────────────────────────────────────
+# 分类收敛: 提取时 LLM 只能从 CANONICAL_CATEGORIES 中选择,
+# 入库前再经 normalize_category 兜底归一化, 避免分类失控膨胀。
+CANONICAL_CATEGORIES = [
+    "Agent 与多智能体",
+    "LLM 与模型",
+    "知识检索与 RAG",
+    "工具与 MCP",
+    "记忆与上下文",
+    "工程与架构",
+    "学习与评估",
+]
+
+# 关键词 → 规范分类 (顺序敏感: 先命中先归入)
+_CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("Agent 与多智能体", ("agent", "多agent", "workflow", "多智能体", "智能体")),
+    ("LLM 与模型", ("llm", "模型", "注意力", "推理", "训练")),
+    ("知识检索与 RAG", ("rag", "检索", "知识库")),
+    ("工具与 MCP", ("mcp", "工具", "协议")),
+    ("记忆与上下文", ("记忆", "上下文", "自更新")),
+    ("工程与架构", ("工程", "架构", "框架", "性能", "源码", "技术栈")),
+    ("学习与评估", ("学习", "面试", "安全", "评估")),
+]
+
+
+def normalize_category(raw: str | None) -> str:
+    """把任意分类字符串归一化到固定分类表 (未识别 → '通用')。"""
+    if not raw:
+        return "通用"
+    text = str(raw).strip()
+    if text in CANONICAL_CATEGORIES:
+        return text
+    lowered = text.lower()
+    for canonical, keywords in _CATEGORY_RULES:
+        if any(k in lowered for k in keywords):
+            return canonical
+    return "通用"
+
+
+# ── 卡片排版规范 ─────────────────────────────────────────
+# 参考 Minecraft Wiki 词条 (如 https://zh.minecraft.wiki/w/交易) 的排版:
+# 短句、列表、表格、紧凑小节, 避免超过三行的大段落。
+CARD_LAYOUT_RULES = """排版规范 (参考 Minecraft Wiki 词条风格, 如 https://zh.minecraft.wiki/w/交易):
+- 用 Markdown 小节标题 (##) 划分: 核心概念 / 原理 / 记忆 / 关联
+- 优先使用列表、短句、表格组织信息
+- 每个连续文本块 (段落/列表项) 不得超过 3 行 (约 90 字)
+- 严禁超过三行的大段落; 长解释拆成多个短块
+- 开头必须是一句话核心概括 (不超过 1 行)"""
+
+_CATEGORY_SELECTOR = "category: 知识领域分类（必须从以下列表中选择一个: " + "、".join(CANONICAL_CATEGORIES) + "）"
+
+SYSTEM_EXTRACT = f"""你是一个知识提取专家，擅长帮助学生理解和记忆。从课件内容中提取知识点，JSON 数组格式。
 
 每个知识点包含:
 - title: 知识点名词 (精简，3-15字)
 - aliases: 别名/英文名列表
-- content: 详细解释 (400-600字，中文)
-  - 先用一句话概括核心概念
-  - 展开讲解原理或机制 (200-300字)
-  - 加入一个恰当的比喻或生活化类比帮助学生记忆
-  - 指出该知识点与其他知识的关联 (如前置知识、后续知识、相似概念对比)
+- content: 知识点的结构化说明 (Markdown 排版, 信息丰富、逻辑清晰)
+  {CARD_LAYOUT_RULES.replace(chr(10), chr(10) + '  ')}
 - examples: 案例列表 (2-3个，包含至少一个比喻或生活化例子)
 - questions: 复习问题列表 (2-3个，考察理解和联系能力)
-- category: 知识领域分类
+- {_CATEGORY_SELECTOR}
 
 要求:
 1. 只提取明确出现在课件中的知识点，不编造
-2. content 必须 400-600 字，信息丰富、逻辑清晰
+2. content 信息丰富，但严格遵循排版规范, 不得出现超过三行的连续文本块
 3. 每张卡片必须包含比喻和知识关联
 4. 返回纯 JSON 数组"""
 
-SYSTEM_EXTRACT_AGGREGATED = """你是一个知识提取专家，擅长帮助学生理解和记忆。
-以下是文档中关于「{topic}」的内容({start}-{end}页)。
+SYSTEM_EXTRACT_AGGREGATED = f"""你是一个知识提取专家，擅长帮助学生理解和记忆。
+以下是文档中关于「{{topic}}」的内容({{start}}-{{end}}页)。
 提取该区间内所有知识点，JSON 数组格式。注意去重，相同的知识点只出现一次。
 
 每个知识点包含:
 - title: 知识点名词 (精简，3-15字)
 - aliases: 别名/英文名列表
-- content: 详细解释 (400-600字，中文)
-  - 先用一句话概括核心概念
-  - 展开讲解原理或机制 (200-300字)
-  - 加入一个恰当的比喻或生活化类比帮助学生记忆
-  - 指出该知识点与其他知识的关联 (如前置知识、后续知识、相似概念对比)
+- content: 知识点的结构化说明 (Markdown 排版, 信息丰富、逻辑清晰)
+  {CARD_LAYOUT_RULES.replace(chr(10), chr(10) + '  ')}
 - examples: 案例列表 (2-3个，包含至少一个比喻或生活化例子)
 - questions: 复习问题列表 (2-3个，考察理解和联系能力)
-- category: 知识领域分类
+- {_CATEGORY_SELECTOR}
 
-要求: content 必须 400-600 字，每张卡片必须包含比喻和知识关联。"""
+要求:
+1. content 信息丰富，但严格遵循排版规范, 不得出现超过三行的连续文本块
+2. 每张卡片必须包含比喻和知识关联
+3. 返回纯 JSON 数组"""
 
 SYSTEM_QA = """你是一个知识问答助手。基于知识库内容回答。
 1. 基于检索到的卡片回答，不编造
@@ -424,7 +471,7 @@ def run_import_workflow(
                         content=content,
                         examples=item.get("examples", []),
                         questions=item.get("questions", []),
-                        category=item.get("category", "未分类"),
+                        category=normalize_category(item.get("category", "未分类")),
                         source_file=item.get("source_file", filename),
                         source_page=item.get("source_page", 0),
                     ))

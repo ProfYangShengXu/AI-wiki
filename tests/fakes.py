@@ -101,4 +101,9 @@ def patch_embeddings(monkeypatch, dimension: int = 384) -> FakeEmbeddings:
     fake = FakeEmbeddings(dimension)
     monkeypatch.setattr("bobanana.tools.embed_text", fake)
     monkeypatch.setattr("bobanana.service.card_service.embed_text", fake)
+    # card_service 单例在 __init__ 时已把 embed_text 复制到 _embedding_fn,
+    # 必须直接替换实例属性, 否则 create/update 仍走真实 embedding 卡住。
+    monkeypatch.setattr(
+        "bobanana.service.card_service.card_service._embedding_fn", fake
+    )
     return fake

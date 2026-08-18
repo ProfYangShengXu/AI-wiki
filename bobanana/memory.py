@@ -91,6 +91,22 @@ def get_history(session_id: str, limit: int = 20) -> list[dict]:
         return []
 
 
+def replace_history(session_id: str, messages: list[dict]) -> None:
+    """整体替换会话历史（用于上下文压缩后落盘，保持前缀稳定）。"""
+    try:
+        conn = _connect()
+        with conn:
+            conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+            for m in messages:
+                conn.execute(
+                    "INSERT INTO messages(session_id, role, content, created_at) VALUES (?,?,?,?)",
+                    (session_id, m.get("role", "user"), m.get("content", ""), _now_iso()),
+                )
+        conn.close()
+    except Exception as e:
+        logger.warning("替换历史失败: %s", e)
+
+
 def save_context(key: str, value) -> None:
     """保存全局上下文键值(JSON 序列化)。"""
     try:
