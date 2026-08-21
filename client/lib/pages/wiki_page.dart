@@ -194,6 +194,8 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                           : '通用',
                       decoration: const InputDecoration(labelText: '分类'),
                       items: [
+                        if (!_categories.contains('通用'))
+                          const DropdownMenuItem(value: '通用', child: Text('通用')),
                         for (final c in _categories)
                           DropdownMenuItem(value: c, child: Text(c)),
                       ],

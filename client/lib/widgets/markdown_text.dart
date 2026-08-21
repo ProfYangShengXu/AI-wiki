@@ -212,7 +212,7 @@ Widget _richText(
     if (m.start > last) {
       spans.addAll(
         _plainSpans(text.substring(last, m.start), base, cardTitles, onCardTap,
-            theme),
+            theme.colorScheme),
       );
     }
     final token = m.group(0)!;
@@ -248,7 +248,8 @@ Widget _richText(
   }
   if (last < text.length) {
     spans.addAll(
-      _plainSpans(text.substring(last), base, cardTitles, onCardTap, theme),
+      _plainSpans(text.substring(last), base, cardTitles, onCardTap,
+          theme.colorScheme),
     );
   }
   if (spans.isEmpty) {
