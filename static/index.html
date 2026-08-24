@@ -438,19 +438,39 @@ const cancelBtn=taskId?'<button class="btn btn-ghost btn-xs" onclick="A.swUpload
 const h='<div class="sw-upload">'
 +'<div class="font-bold" style="font-size:15px">📄 上传任务</div>'
 +'<div style="font-size:12px;color:var(--muted);margin-top:4px">'+esc(filename||'')+'</div>'
-+'<div id="swUpStatus" style="margin-top:10px;font-size:13px">处理中…</div>'
-+'<div style="margin-top:6px;height:8px;background:var(--card-2);border-radius:4px;overflow:hidden;border:1px solid var(--border)"><div id="swUpBar" style="height:100%;width:0%;background:var(--accent);transition:width .3s"></div></div>'
++'<div id="swUpStatus" style="margin-top:10px;font-size:13px;display:flex;align-items:center;gap:8px"><span class="sw-spinner" style="width:14px;height:14px;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:spin 0.9s linear infinite"></span><span>专属 Wiki 生成中…</span></div>'
++'<div style="margin-top:6px;height:8px;background:var(--card-2);border-radius:4px;overflow:hidden;border:1px solid var(--border)"><div id="swUpBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--link));transition:width .4s"></div></div>'
 +'<div id="swUpResult" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>'
 +'<div style="margin-top:10px;display:flex;gap:8px">'+cancelBtn+'</div>'
 +'</div>';
 $('main').innerHTML=h;
+// 假进度: 缓慢推进到 92%, 完成时跳 100% (真实进度取决于 AI 提取)
+let pct=4;
+this._swFakePct=pct;
+if(this._swFakeTimer)clearInterval(this._swFakeTimer);
+this._swFakeTimer=setInterval(()=>{
+const cur=this._swFakePct;
+if(cur>=92){clearInterval(this._swFakeTimer);this._swFakeTimer=null;return}
+const step=Math.max(0.5,(92-cur)*0.06);
+this._swFakePct=Math.min(92,cur+step);
+const bar=$('swUpBar');if(bar)bar.style.width=this._swFakePct+'%';
+},900);
 },
 swUploadRender(s){
 const st=$('swUpStatus'),bar=$('swUpBar'),res=$('swUpResult');
 const status=s.status||'';
-if(st)st.textContent=this.swUploadStatusText(status);
+if(st){
+if(status==='done'){st.innerHTML='<span style="color:var(--ok)">✓ 专属 Wiki 已生成</span>'}
+else if(A.swUploadTerminal(status)){st.innerHTML='<span style="color:var(--danger)">✗ '+this.swUploadStatusText(status)+'</span>'}
+else{st.innerHTML='<span class="sw-spinner" style="width:14px;height:14px;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:spin 0.9s linear infinite"></span><span>专属 Wiki 生成中…</span>'}
+}
 const prog=s.progress||{};
-if(bar){if(typeof prog.current==='number'&&typeof prog.total==='number'&&prog.total>0){const pct=Math.max(0,Math.min(100,Math.round(prog.current/prog.total*100)));bar.style.width=pct+'%'}else if(status==='done'){bar.style.width='100%'}else if(status==='failed'||status==='error'||status==='cancelled'){bar.style.width='0%'}}
+if(bar){
+if(status==='done'){bar.style.width='100%'}
+else if(A.swUploadTerminal(status)){bar.style.width='0%'}
+else if(this._swFakePct){bar.style.width=this._swFakePct+'%'}
+else if(typeof prog.current==='number'&&typeof prog.total==='number'&&prog.total>0){const pct=Math.max(0,Math.min(100,Math.round(prog.current/prog.total*100)));bar.style.width=pct+'%'}
+}
 const result=s.result||s;
 if(res){const imp=result.imported??0,skip=result.skipped??0,fail=result.failed??0;if(imp||skip||fail){res.textContent='导入 '+imp+' · 跳过 '+skip+' · 失败 '+fail}else if(status==='done'){res.textContent='导入完成'}else if(status==='failed'||status==='error'){res.textContent='失败: '+(s.message||'')}else if(status==='cancelled'){res.textContent='任务已取消'}}
 },
@@ -463,6 +483,7 @@ try{const r=await fetch('/api/upload/status/'+taskId);const d=await r.json();if(
 A.swUploadRender(s);
 if(A.swUploadTerminal(s.status||'')){
 clearInterval(timer);A._uploadTimer=null;
+if(this._swFakeTimer){clearInterval(this._swFakeTimer);this._swFakeTimer=null}
 if(s.status==='done'){try{await fetch('/api/cards/deduplicate',{method:'POST'})}catch(e){}await A.load();const cards=(s.cards&&s.cards.length)?s.cards:null;if(cards&&cards.length)A.openCard(cards[0].id||cards[0])}
 else{await A.load()}
 const res=$('swUpResult');if(res&&!(s.status==='done'&&(s.cards||[]).length)){res.innerHTML+=' <button class="btn btn-primary btn-xs" style="margin-left:8px" onclick="A.mainClear()">返回</button>'}
