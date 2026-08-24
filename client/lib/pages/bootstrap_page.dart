@@ -85,7 +85,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                       const SizedBox(height: 16),
                       _label('Provider'),
                       DropdownButtonFormField<String>(
-                        value: _provider,
+                        initialValue: _provider,
                         items: const [
                           DropdownMenuItem(
                             value: 'deepseek',
@@ -139,7 +139,7 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                       const SizedBox(height: 12),
                       _label('模型 (Model)'),
                       DropdownButtonFormField<String>(
-                        value: _model,
+                        initialValue: _model,
                         items: const [
                           DropdownMenuItem(
                             value: 'deepseek-v4-flash',

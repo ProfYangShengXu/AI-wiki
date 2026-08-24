@@ -65,13 +65,66 @@ class GlassTheme {
   }
 
   /// 页面渐变背景 (配合 Scaffold 使用)。
+  ///
+  /// 模拟 iOS 壁纸: 线性渐变打底 + 从中心/角落散开的径向辉光光斑。
   static Widget background(BuildContext context, {required Widget child}) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: dark ? darkBackgroundGradient : backgroundGradient,
       ),
-      child: child,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 径向辉光光斑 (大范围径向模糊感)
+          Positioned(
+            top: -120,
+            right: -80,
+            child: _glowOrb(
+              dark
+                  ? const Color(0x333B82F6)
+                  : const Color(0x553B82F6),
+              size: 420,
+            ),
+          ),
+          Positioned(
+            bottom: -140,
+            left: -60,
+            child: _glowOrb(
+              dark
+                  ? const Color(0x228B5CF6)
+                  : const Color(0x448B5CF6),
+              size: 380,
+            ),
+          ),
+          Positioned(
+            top: 240,
+            left: -120,
+            child: _glowOrb(
+              dark
+                  ? const Color(0x1FEC4899)
+                  : const Color(0x33EC4899),
+              size: 300,
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  static Widget _glowOrb(Color color, {required double size}) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [color, color.withValues(alpha: 0)],
+          ),
+        ),
+      ),
     );
   }
 
@@ -198,6 +251,80 @@ class GlassTheme {
         ),
       ),
       splashFactory: InkRipple.splashFactory,
+    );
+  }
+}
+
+/// 弹性回弹按压容器 — iOS 上下文菜单式反馈。
+///
+/// 按下时缩小到 [pressedScale] (默认 0.96), 松手用弹性曲线回弹。
+class SpringPress extends StatefulWidget {
+  const SpringPress({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.pressedScale = 0.96,
+    this.duration = const Duration(milliseconds: 260),
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+  final Duration duration;
+
+  @override
+  State<SpringPress> createState() => _SpringPressState();
+}
+
+class _SpringPressState extends State<SpringPress> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1.0,
+        duration: widget.duration,
+        curve: _pressed
+            ? Curves.easeOut
+            : Curves.easeOutBack,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// 页面切换过渡 — 平滑缩放 + 淡入 (iOS transition 手势感)。
+class GlassPageTransition extends StatelessWidget {
+  const GlassPageTransition({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 320),
+  });
+
+  final Widget child;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.94, end: 1.0),
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: 0.6 + 0.4 * value,
+        child: Transform.scale(scale: value, child: child),
+      ),
+      child: child,
     );
   }
 }

@@ -88,11 +88,19 @@ class _HomeShellState extends State<HomeShell> {
                   ],
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: IndexedStack(index: _index, children: _pages)),
+                Expanded(
+                  child: GlassPageTransition(
+                    key: ValueKey('page-$_index'),
+                    child: IndexedStack(index: _index, children: _pages),
+                  ),
+                ),
               ],
             );
           }
-          return IndexedStack(index: _index, children: _pages);
+          return GlassPageTransition(
+            key: ValueKey('page-$_index'),
+            child: IndexedStack(index: _index, children: _pages),
+          );
           },
         ),
       ),

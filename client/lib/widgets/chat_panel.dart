@@ -426,7 +426,10 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                 ),
               ),
               const SizedBox(width: 8),
-              FilledButton(onPressed: _send, child: const Text('发送')),
+              SpringPress(
+                onTap: _send,
+                child: FilledButton(onPressed: _send, child: const Text('发送')),
+              ),
             ],
           ),
         ),

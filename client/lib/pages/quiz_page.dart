@@ -5,6 +5,7 @@ import '../core/api_client.dart';
 import '../models/knowledge_card.dart';
 import '../models/offline_pack.dart';
 import '../services/offline_pack_service.dart';
+import '../theme/glass_theme.dart';
 
 class QuizPage extends ConsumerStatefulWidget {
   const QuizPage({super.key});
@@ -143,7 +144,7 @@ class _QuizPageState extends ConsumerState<QuizPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<String>(
-            value: _selectedCardId,
+            initialValue: _selectedCardId,
             decoration: const InputDecoration(labelText: '选择卡片'),
             items: _cards
                 .map(
@@ -185,11 +186,17 @@ class _QuizPageState extends ConsumerState<QuizPage> {
           ),
           if (results is List)
             ...results.map(
-              (r) => Card(
-                child: ListTile(
-                  title: Text(r['comment']?.toString() ?? ''),
-                  subtitle: Text(
-                    '${r['score'] ?? 0} 分 · ${r['reference'] ?? ''}',
+              (r) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GlassTheme.glassCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  radius: const BorderRadius.all(Radius.circular(16)),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(r['comment']?.toString() ?? ''),
+                    subtitle: Text(
+                      '${r['score'] ?? 0} 分 · ${r['reference'] ?? ''}',
+                    ),
                   ),
                 ),
               ),
@@ -208,10 +215,11 @@ class _QuizPageState extends ConsumerState<QuizPage> {
             itemBuilder: (context, index) {
               final question = _questions[index];
               final controller = _controllerFor(question);
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Padding(
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GlassTheme.glassCard(
                   padding: const EdgeInsets.all(12),
+                  radius: const BorderRadius.all(Radius.circular(16)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

@@ -253,7 +253,7 @@ Widget _richText(
     );
   }
   if (spans.isEmpty) {
-    spans.add(TextSpan(text: ''));
+    spans.add(const TextSpan(text: ''));
   }
   return Text.rich(TextSpan(style: base, children: spans));
 }
@@ -296,11 +296,11 @@ List<TextSpan> _plainSpans(
     if (matchStart > cursor) {
       spans.add(TextSpan(text: text.substring(cursor, matchStart)));
     }
+    final title = matchedTitle;
     spans.add(TextSpan(
-      text: matchedTitle,
+      text: title,
       style: base.copyWith(color: theme.primary),
-      recognizer: TapGestureRecognizer()
-        ..onTap = () => onCardTap(matchedTitle),
+      recognizer: TapGestureRecognizer()..onTap = () => onCardTap(title),
     ));
     cursor = matchEnd;
   }
