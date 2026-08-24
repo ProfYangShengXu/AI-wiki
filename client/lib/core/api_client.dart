@@ -296,10 +296,20 @@ class ApiClient {
 
   /// 上传文档并返回任务信息 {task_id, filename, storage_name, size}。
   Future<Map<String, dynamic>> uploadDocument(File file) async {
+    // 用平台分隔符取文件名, 避免 file.uri.pathSegments 对中文路径
+    // 在 Windows 上产生编码问题(multipart header 写入失败 → errno 22)。
+    final separator = Platform.pathSeparator;
+    final rawName = file.path.split(separator).last;
+    // 文件名保留原始字符(后端按 UTF-8 解码), 但剔除可能破坏
+    // Content-Disposition 的引号/控制字符。
+    final safeName = rawName
+        .replaceAll('"', '')
+        .replaceAll(RegExp(r'[\x00-\x1f]'), '_')
+        .trim();
     final form = FormData.fromMap({
       'file': await MultipartFile.fromFile(
         file.path,
-        filename: file.uri.pathSegments.last,
+        filename: safeName.isEmpty ? 'upload' : safeName,
       ),
     });
     return _dataOf(

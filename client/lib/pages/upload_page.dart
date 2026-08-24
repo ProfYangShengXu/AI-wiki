@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../services/app_logger.dart';
 import '../state/refresh.dart';
 
 /// 文档导入页: 选择文件 → 上传 → 实时轮询任务进度 → 展示结果。
@@ -48,7 +49,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         return;
       }
       await _poll(taskId);
-    } catch (e) {
+    } catch (e, st) {
+      // 记录完整异常(含堆栈)到客户端日志, 便于排查 Windows 端 OS 错误
+      try {
+        AppLogger.log('导入异常: $e\n$st');
+      } catch (_) {}
       setState(() => _status = '上传失败: $e');
     } finally {
       if (mounted) setState(() => _busy = false);

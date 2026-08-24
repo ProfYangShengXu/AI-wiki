@@ -8,6 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/api_client.dart';
 import '../models/ws_event.dart';
+import '../services/app_logger.dart';
 import '../state/refresh.dart';
 import '../widgets/markdown_text.dart';
 
@@ -290,8 +291,11 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
           'data': {'mode': 'agent'},
         }),
       );
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
+      try {
+        AppLogger.log('聊天导入异常: $e\n$st');
+      } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('上传失败: $e')),
       );
