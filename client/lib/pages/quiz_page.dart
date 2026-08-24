@@ -85,6 +85,7 @@ class _QuizPageState extends ConsumerState<QuizPage> {
         'answer': _answers[q.question]?.text.trim() ?? '',
       };
     }).toList();
+    setState(() => _loadingQuiz = true);
     try {
       final result =
           await ref.read(apiClientProvider).gradeQuiz(
@@ -92,11 +93,15 @@ class _QuizPageState extends ConsumerState<QuizPage> {
                 answers: answers,
               );
       if (!mounted) return;
-      setState(() => _result = result);
+      setState(() {
+        _result = result;
+        _loadingQuiz = false;
+      });
       // 网络已恢复：尝试回传离线队列中的历史评分。
       _flushOfflineQueue();
     } catch (e) {
       if (!mounted) return;
+      setState(() => _loadingQuiz = false);
       // 离线作答：结果进入待回传队列，网络恢复后批量 POST /api/quiz/grade。
       await ref.read(offlinePackServiceProvider).enqueueGrade(
             QuizGradeRequest(
@@ -232,11 +237,18 @@ class _QuizPageState extends ConsumerState<QuizPage> {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: FilledButton.icon(
-            onPressed: _loadingQuiz ? null : _grade,
-            icon: const Icon(Icons.grade),
-            label: const Text('提交评分'),
-          ),
+          child: _loadingQuiz
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              : FilledButton.icon(
+                  onPressed: _grade,
+                  icon: const Icon(Icons.grade),
+                  label: const Text('提交评分'),
+                ),
         ),
       ],
     );

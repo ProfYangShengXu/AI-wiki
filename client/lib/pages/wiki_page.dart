@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../models/knowledge_card.dart';
 import '../state/refresh.dart';
+import '../theme/glass_theme.dart';
 import '../widgets/chat_panel.dart';
 import '../widgets/markdown_text.dart';
 
 class WikiPage extends ConsumerStatefulWidget {
-  const WikiPage({super.key});
+  const WikiPage({super.key, this.reloadNotifier});
+
+  /// HomeShell 切到知识库 tab 时递增, 触发强制刷新(双保险)。
+  final ValueNotifier<int>? reloadNotifier;
 
   @override
   ConsumerState<WikiPage> createState() => _WikiPageState();
@@ -26,7 +30,18 @@ class _WikiPageState extends ConsumerState<WikiPage> {
   @override
   void initState() {
     super.initState();
+    widget.reloadNotifier?.addListener(_onReloadSignal);
     _load();
+  }
+
+  @override
+  void dispose() {
+    widget.reloadNotifier?.removeListener(_onReloadSignal);
+    super.dispose();
+  }
+
+  void _onReloadSignal() {
+    if (mounted) _load();
   }
 
   Future<void> _load() async {
@@ -70,14 +85,18 @@ class _WikiPageState extends ConsumerState<WikiPage> {
   }
 
   void _onCardLinked(String title) {
-    // 从对话/详情链接跳转到对应卡片
-    final match = _cards.where((c) => c.title == title).toList();
+    // 从对话/详情链接跳转到对应卡片 (标题或别名)
+    final match = _cards.where((c) =>
+        c.title == title || c.aliases.contains(title)).toList();
     if (match.isNotEmpty) {
       _open(match.first);
     }
   }
 
-  Set<String> get _cardTitles => {for (final c in _cards) c.title};
+  Set<String> get _cardTitles => {
+        for (final c in _cards)
+          ...{c.title, ...c.aliases},
+      };
 
   Future<void> _editCard(KnowledgeCard card) async {
     final updated = await _showCardEditor(card);
@@ -303,7 +322,7 @@ class _WikiPageState extends ConsumerState<WikiPage> {
             SizedBox(
               width: 360,
               child: ChatPanel(
-                showModeToggle: false,
+                showModeToggle: true,
                 cardTitles: _cardTitles,
                 onCardTap: _onCardLinked,
               ),
@@ -359,24 +378,34 @@ class _WikiPageState extends ConsumerState<WikiPage> {
           child: filtered.isEmpty
               ? const Center(child: Text('暂无卡片'))
               : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final card = filtered[index];
-                    return ListTile(
-                      title: Text(
-                        card.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: GlassTheme.glassCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        radius: const BorderRadius.all(Radius.circular(14)),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            card.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            card.sourceFile.isNotEmpty
+                                ? '${card.category} · ${card.sourceFile}'
+                                : card.category,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          selected: _selected?.id == card.id,
+                          onTap: () => _open(card),
+                        ),
                       ),
-                      subtitle: Text(
-                        card.sourceFile.isNotEmpty
-                            ? '${card.category} · ${card.sourceFile}'
-                            : card.category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      selected: _selected?.id == card.id,
-                      onTap: () => _open(card),
                     );
                   },
                 ),
@@ -389,7 +418,7 @@ class _WikiPageState extends ConsumerState<WikiPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (onBack != null)
             TextButton.icon(
@@ -397,6 +426,10 @@ class _WikiPageState extends ConsumerState<WikiPage> {
               icon: const Icon(Icons.arrow_back),
               label: const Text('返回'),
             ),
+          GlassTheme.glassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -463,6 +496,9 @@ class _WikiPageState extends ConsumerState<WikiPage> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+              ],
+            ),
+          ),
         ],
       ),
     );

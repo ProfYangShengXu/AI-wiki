@@ -276,11 +276,17 @@ class CardService:
         """同步版搜索 — 混合检索(BM25 + 向量余弦 + RRF 融合)。
 
         filters 支持 category / source_file / min_mastery(候选取出后过滤)。
+        embedding 计算失败时回退纯 BM25 关键词检索, 保证 ask 模式
+        在向量模型不可用时仍能返回知识库结果, 而不是空结果。
         """
         import time as _time
         t0 = _time.monotonic()
         try:
             embedding = self._compute_embedding(query)
+        except Exception as e:  # noqa: BLE001 — embedding 失败不应阻断检索
+            logger.warning("embedding 计算失败, 回退 BM25 检索: %s", e)
+            embedding = None
+        try:
             return db_manager.hybrid_search(query, embedding, top_k, **filters)
         finally:
             try:

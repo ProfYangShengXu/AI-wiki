@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'pages/bootstrap_page.dart';
 import 'pages/home_shell.dart';
 import 'state/bootstrap_controller.dart';
+import 'theme/glass_theme.dart';
 
 class StudyWikiApp extends StatelessWidget {
   const StudyWikiApp({super.key});
@@ -13,16 +14,8 @@ class StudyWikiApp extends StatelessWidget {
     return MaterialApp(
       title: 'StudyWiki-Agent',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF2563EB),
-        brightness: Brightness.light,
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF2563EB),
-        brightness: Brightness.dark,
-      ),
+      theme: GlassTheme.buildTheme(brightness: Brightness.light),
+      darkTheme: GlassTheme.buildTheme(brightness: Brightness.dark),
       themeMode: ThemeMode.system,
       home: const BootstrapGate(),
     );

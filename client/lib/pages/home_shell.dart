@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/glass_theme.dart';
 import 'chat_page.dart';
 import 'quiz_page.dart';
 import 'settings_page.dart';
@@ -16,29 +17,47 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
+  /// 切回知识库 tab 时递增, WikiPage 据此强制刷新(导入完成等)。
+  final _wikiReload = ValueNotifier<int>(0);
+
   static const _titles = ['知识库', '对话', '导入', 'Quiz', '设置'];
-  static const _pages = [
-    WikiPage(),
-    ChatPage(),
-    UploadPage(),
-    QuizPage(),
-    SettingsPage(),
+  late final List<Widget> _pages = [
+    WikiPage(reloadNotifier: _wikiReload),
+    const ChatPage(),
+    const UploadPage(),
+    const QuizPage(),
+    const SettingsPage(),
   ];
+
+  @override
+  void dispose() {
+    _wikiReload.dispose();
+    super.dispose();
+  }
+
+  void _onTabSelected(int value) {
+    setState(() => _index = value);
+    if (value == 0) {
+      _wikiReload.value++;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(title: Text(_titles[_index])),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
+      body: GlassTheme.background(
+        context,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
           final useRail = constraints.maxWidth >= 760;
           if (useRail) {
             return Row(
               children: [
                 NavigationRail(
                   selectedIndex: _index,
-                  onDestinationSelected: (value) =>
-                      setState(() => _index = value),
+                  onDestinationSelected: _onTabSelected,
                   labelType: NavigationRailLabelType.all,
                   destinations: const [
                     NavigationRailDestination(
@@ -74,14 +93,15 @@ class _HomeShellState extends State<HomeShell> {
             );
           }
           return IndexedStack(index: _index, children: _pages);
-        },
+          },
+        ),
       ),
       bottomNavigationBar: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth >= 760) return const SizedBox.shrink();
           return NavigationBar(
             selectedIndex: _index,
-            onDestinationSelected: (value) => setState(() => _index = value),
+            onDestinationSelected: _onTabSelected,
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.menu_book_outlined),

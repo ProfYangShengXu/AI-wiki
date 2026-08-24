@@ -143,3 +143,35 @@ def test_list_cards_sort_by_source(tmp_path, monkeypatch, isolated_chroma):
     assert total == 4
     # 文件B 先导入 → B 的文件排前面, 组内按页码: B2(1) < B1(3); 然后 A: A2(1) < A1(2)
     assert [c.title for c in sourced] == ["B2", "B1", "A2", "A1"]
+
+
+# ── 检索 embedding 失败回退 BM25 ─────────────────────────
+
+def test_search_fallback_bm25_when_embedding_fails(tmp_path, monkeypatch, isolated_chroma):
+    """embedding 计算失败时, ask 检索回退纯 BM25, 不返回空。"""
+    patch_embeddings(monkeypatch)
+    from bobanana.database import db_manager
+    from bobanana.models import KnowledgeCard
+    from bobanana.service.card_service import card_service
+
+    db_manager.add_card(
+        KnowledgeCard(title="提示链", content="将复杂任务拆解为固定顺序步骤的工作流模式",
+                      category="通用"), [0.1] * 384
+    )
+    db_manager.add_card(
+        KnowledgeCard(title="MCP协议", content="模型上下文协议, 工具调用", category="通用"),
+        [0.1] * 384,
+    )
+
+    # 模拟 embedding 模型加载失败
+    orig = card_service._compute_embedding
+    def _boom(_text):
+        raise RuntimeError("model load failed")
+    card_service._compute_embedding = _boom
+    try:
+        cards = card_service.search_cards_sync("提示链", top_k=3)
+    finally:
+        card_service._compute_embedding = orig
+
+    assert len(cards) >= 1, "embedding 失败时应有 BM25 回退结果"
+    assert cards[0][0].title == "提示链"

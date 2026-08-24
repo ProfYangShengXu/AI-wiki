@@ -10,6 +10,7 @@ import '../core/api_client.dart';
 import '../models/ws_event.dart';
 import '../services/app_logger.dart';
 import '../state/refresh.dart';
+import '../theme/glass_theme.dart';
 import '../widgets/markdown_text.dart';
 
 class _ToolStep {
@@ -447,48 +448,57 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
       );
     }
     final isUser = item.role == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: const BoxConstraints(maxWidth: 560),
-        decoration: BoxDecoration(
-          color: isUser
-              ? theme.colorScheme.primary
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item.text.isNotEmpty)
-              isUser
-                  ? Text(
-                      item.text,
-                      style: TextStyle(color: theme.colorScheme.onPrimary),
-                    )
-                  : MarkdownText(
-                      item.text,
-                      cardTitles: widget.cardTitles,
-                      onCardTap: widget.onCardTap,
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                    ),
-            if (item.streaming)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '…',
+    final bubbleContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (item.text.isNotEmpty)
+          isUser
+              ? Text(
+                  item.text,
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
+                )
+              : MarkdownText(
+                  item.text,
+                  cardTitles: widget.cardTitles,
+                  onCardTap: widget.onCardTap,
                   style: TextStyle(color: theme.colorScheme.onSurface),
                 ),
+        if (item.streaming)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '…',
+              style: TextStyle(color: theme.colorScheme.onSurface),
+            ),
+          ),
+        if (item.toolSteps.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          ...item.toolSteps.map((step) => _buildToolStep(step)),
+        ],
+      ],
+    );
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: isUser
+          ? Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              constraints: const BoxConstraints(maxWidth: 560),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(14),
               ),
-            if (item.toolSteps.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              ...item.toolSteps.map((step) => _buildToolStep(step)),
-            ],
-          ],
-        ),
-      ),
+              child: bubbleContent,
+            )
+          : GlassTheme.glassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              radius: const BorderRadius.all(Radius.circular(14)),
+              opacity: 0.5,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: bubbleContent,
+              ),
+            ),
     );
   }
 

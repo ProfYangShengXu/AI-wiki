@@ -265,21 +265,49 @@ List<TextSpan> _plainSpans(
   void Function(String title)? onCardTap,
   ColorScheme theme,
 ) {
-  if (cardTitles.isEmpty || onCardTap == null) {
+  if (cardTitles.isEmpty || onCardTap == null || text.isEmpty) {
     return [TextSpan(text: text)];
   }
-  // 整段精确匹配卡片标题 → 链接
-  final trimmed = text.trim();
-  if (cardTitles.contains(trimmed)) {
-    return [
-      TextSpan(
-        text: trimmed,
-        style: base.copyWith(color: theme.primary),
-        recognizer: TapGestureRecognizer()..onTap = () => onCardTap(trimmed),
-      ),
-    ];
+  // 文本内任意位置匹配卡片标题 → 链接 (按标题长度降序, 避免短标题
+  // 先匹配吃掉长标题的前缀)。标题出现多次也全部链接化。
+  final sorted = cardTitles.toList()
+    ..sort((a, b) => b.length.compareTo(a.length));
+  final spans = <TextSpan>[];
+  var cursor = 0;
+  while (cursor < text.length) {
+    String? matchedTitle;
+    var matchStart = -1;
+    var matchEnd = -1;
+    for (final title in sorted) {
+      final idx = text.indexOf(title, cursor);
+      if (idx >= 0 && (matchStart < 0 || idx < matchStart)) {
+        matchStart = idx;
+        matchEnd = idx + title.length;
+        matchedTitle = title;
+      }
+    }
+    if (matchedTitle == null || matchStart < 0) {
+      // 剩余无匹配
+      if (cursor < text.length) {
+        spans.add(TextSpan(text: text.substring(cursor)));
+      }
+      break;
+    }
+    if (matchStart > cursor) {
+      spans.add(TextSpan(text: text.substring(cursor, matchStart)));
+    }
+    spans.add(TextSpan(
+      text: matchedTitle,
+      style: base.copyWith(color: theme.primary),
+      recognizer: TapGestureRecognizer()
+        ..onTap = () => onCardTap(matchedTitle),
+    ));
+    cursor = matchEnd;
   }
-  return [TextSpan(text: text)];
+  if (spans.isEmpty) {
+    spans.add(TextSpan(text: text));
+  }
+  return spans;
 }
 
 /// 块级解析: 按行分组为标题 / 列表 / 引用 / 表格 / 段落。
