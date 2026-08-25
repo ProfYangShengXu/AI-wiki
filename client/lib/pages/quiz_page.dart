@@ -188,7 +188,7 @@ class _QuizPageState extends ConsumerState<QuizPage> {
             ...results.map(
               (r) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: GlassTheme.glassCard(
+                child: GlassTheme.glassTile(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   radius: const BorderRadius.all(Radius.circular(16)),
                   child: ListTile(

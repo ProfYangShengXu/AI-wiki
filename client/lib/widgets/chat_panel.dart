@@ -364,14 +364,21 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
         if (widget.showModeToggle)
           Padding(
             padding: const EdgeInsets.all(8),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'ask', label: Text('Ask')),
-                ButtonSegment(value: 'agent', label: Text('Agent')),
-              ],
-              selected: {_mode},
-              onSelectionChanged: (values) =>
-                  setState(() => _mode = values.first),
+            // 模式切换器: 毛玻璃浮层(用户指定的半透明组件场景)
+            child: GlassTheme.glassCard(
+              padding: const EdgeInsets.all(4),
+              radius: const BorderRadius.all(Radius.circular(12)),
+              blur: 20,
+              opacity: 0.5,
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'ask', label: Text('Ask')),
+                  ButtonSegment(value: 'agent', label: Text('Agent')),
+                ],
+                selected: {_mode},
+                onSelectionChanged: (values) =>
+                    setState(() => _mode = values.first),
+              ),
             ),
           ),
         Expanded(

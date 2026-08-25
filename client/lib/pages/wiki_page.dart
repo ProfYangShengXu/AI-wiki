@@ -426,7 +426,8 @@ class _WikiPageState extends ConsumerState<WikiPage> {
               icon: const Icon(Icons.arrow_back),
               label: const Text('返回'),
             ),
-          GlassTheme.glassCard(
+          GlassTheme.glassTile(
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

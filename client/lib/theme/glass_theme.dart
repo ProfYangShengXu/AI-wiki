@@ -16,14 +16,14 @@ class GlassTheme {
   static const Color accent = Color(0xFF8B5CF6);
   static const Color pinkGlow = Color(0xFFEC4899);
 
-  /// 浅色背景: 蓝紫渐变, 明度较之前降低约 45% (更沉静, 衬出玻璃卡片)。
+  /// 浅色背景: 近白灰基调, 极淡辉光 (极简深灰风格)。
   static LinearGradient get backgroundGradient => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFF93B8F0), // 中蓝 (原 0xFFDBEAFE 降明度)
-          Color(0xFFA58FE8), // 中紫 (原 0xFFE9D5FF 降明度)
-          Color(0xFFD0A0D8), // 中粉 (原 0xFFFCE7F3 降明度)
+          Color(0xFFF2F3F5), // 近白灰
+          Color(0xFFF0F0F4), // 微冷灰
+          Color(0xFFF3F1F5), // 微暖灰
         ],
         stops: [0.0, 0.55, 1.0],
       );
@@ -32,19 +32,17 @@ class GlassTheme {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFF0B1220),
-          Color(0xFF1E1B4B),
-          Color(0xFF2E1065),
+          Color(0xFF111318), // 深灰黑
+          Color(0xFF14161C),
+          Color(0xFF17181F),
         ],
         stops: [0.0, 0.55, 1.0],
       );
 
-  /// 毛玻璃卡片包装: BackdropFilter 模糊 + 半透明填充 + 细描边 + 顶部高光。
+  /// 毛玻璃浮层容器 — 仅用于悬浮组件 (如 agent/ask 切换器、对话框)。
   ///
-  /// 自动感知深浅模式: 浅色用白色半透明玻璃, 深色用黑色半透明玻璃,
-  /// 保证文字对比度 (深色模式下浅色文字在深色卡片上)。
-  /// [blur] 传 0 时跳过 BackdropFilter(纯半透明), 用于滚动列表等
-  /// 高频重建场景, 避免大量模糊层导致卡顿。
+  /// BackdropFilter 模糊 + 半透明, 数量少(一次 1~2 个)时成本可忽略。
+  /// 自动感知深浅模式: 浅色白玻璃, 深色黑玻璃。
   static Widget glassCard({
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(16),
@@ -68,17 +66,6 @@ class GlassTheme {
           color: borderColor ?? cardColor.withValues(alpha: 0.6),
           width: 0.5,
         ),
-        // 顶部高光: 模拟 iOS 玻璃面板的反光条
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            cardColor.withValues(alpha: dark ? 0.18 : 0.35),
-            cardColor.withValues(alpha: dark ? 0.06 : 0.10),
-            cardColor.withValues(alpha: dark ? 0.02 : 0.04),
-          ],
-          stops: const [0.0, 0.25, 1.0],
-        ),
       ),
       child: child,
     );
@@ -92,10 +79,10 @@ class GlassTheme {
     );
   }
 
-  /// 列表项轻量玻璃容器 — 无 BackdropFilter, 仅半透明 + 细描边。
+  /// 纯色卡片容器 — 极简深灰风格, 无模糊无半透明。
   ///
-  /// 用于 ListView.builder 等高频重建场景: 视觉与 [glassCard] 几乎一致,
-  /// 但零模糊开销, 滚动不再卡顿。
+  /// 浅色模式近白底, 深色模式深灰底; 用于所有卡片/列表项
+  /// (知识库列表、quiz 题目、对话气泡等)。
   static Widget glassTile({
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(12),
@@ -107,14 +94,16 @@ class GlassTheme {
         ? true
         : WidgetsBinding.instance.platformDispatcher.platformBrightness ==
             Brightness.dark;
-    final cardColor = dark ? Colors.black : Colors.white;
+    final cardColor = dark ? const Color(0xFF1C1E26) : const Color(0xFFFFFFFF);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: cardColor.withValues(alpha: opacity),
+        color: cardColor,
         borderRadius: radius,
         border: Border.all(
-          color: cardColor.withValues(alpha: dark ? 0.15 : 0.4),
+          color: dark
+              ? const Color(0xFF2A2D36)
+              : const Color(0xFFE4E6EA),
           width: 0.5,
         ),
       ),
@@ -135,12 +124,12 @@ class GlassTheme {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 大半径径向辉光 (alpha 提高, 光斑明显)
+          // 极淡辉光 (alpha 8-12%), 只留一点氛围感
           Positioned(
             top: -140,
             right: -100,
             child: _glowOrb(
-              dark ? const Color(0x663B82F6) : const Color(0x703B82F6),
+              dark ? const Color(0x143B82F6) : const Color(0x1F3B82F6),
               size: 460,
             ),
           ),
@@ -148,7 +137,7 @@ class GlassTheme {
             bottom: -160,
             left: -80,
             child: _glowOrb(
-              dark ? const Color(0x668B5CF6) : const Color(0x668B5CF6),
+              dark ? const Color(0x148B5CF6) : const Color(0x1F8B5CF6),
               size: 420,
             ),
           ),
@@ -156,7 +145,7 @@ class GlassTheme {
             top: 200,
             left: -140,
             child: _glowOrb(
-              dark ? const Color(0x55EC4899) : const Color(0x59EC4899),
+              dark ? const Color(0x10EC4899) : const Color(0x1AEC4899),
               size: 340,
             ),
           ),
@@ -164,7 +153,7 @@ class GlassTheme {
             bottom: 100,
             right: -120,
             child: _glowOrb(
-              dark ? const Color(0x4438BDF8) : const Color(0x4D38BDF8),
+              dark ? const Color(0x0D38BDF8) : const Color(0x1438BDF8),
               size: 300,
             ),
           ),
@@ -201,13 +190,16 @@ class GlassTheme {
       surface: dark ? const Color(0xFF1A2233) : const Color(0xFFF8FAFF),
     );
     final baseText = dark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937);
+    // 中文首选 PingFang SC (macOS/iOS), Windows 回退微软雅黑/系统无衬线
+    const zhFallback = ['PingFang SC', 'Microsoft YaHei', 'Segoe UI'];
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
-      fontFamily: null, // 系统字体 (Windows 默认 Segoe UI, 视觉接近 SF Pro)
+      fontFamily: 'PingFang SC', // 中文用苹方, 缺失时走 fallback
+      fontFamilyFallback: zhFallback,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
