@@ -103,7 +103,6 @@ class _WikiPageState extends ConsumerState<WikiPage> {
     try {
       await ref.read(apiClientProvider).updateCard(card.id, updated);
       ref.read(dataRefreshProvider.notifier).state++;
-      await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('卡片已更新')),
@@ -128,7 +127,6 @@ class _WikiPageState extends ConsumerState<WikiPage> {
         'category': created['category'] ?? '通用',
       });
       ref.read(dataRefreshProvider.notifier).state++;
-      await _load();
       if (mounted) {
         _open(card);
       }
@@ -164,7 +162,6 @@ class _WikiPageState extends ConsumerState<WikiPage> {
       await ref.read(apiClientProvider).deleteCard(card.id);
       ref.read(dataRefreshProvider.notifier).state++;
       setState(() => _selected = null);
-      await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('卡片已删除')),

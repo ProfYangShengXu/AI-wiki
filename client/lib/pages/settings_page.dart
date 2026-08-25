@@ -127,7 +127,7 @@ class SettingsPage extends ConsumerWidget {
                 await SidecarService.instance.stopSidecar();
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('已请求停止后端(仅对本客户端拉起的进程生效)')),
+                  const SnackBar(content: Text('已停止后端服务')),
                 );
               },
             ),

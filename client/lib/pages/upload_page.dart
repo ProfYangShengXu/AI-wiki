@@ -29,6 +29,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   Timer? _fakeTicker;
 
   void _startFakeProgress() {
+    // 防重复启动: 先停掉可能残留的旧 timer
+    _fakeTicker?.cancel();
     _fakeProgress = 0;
     // 每 800ms 缓慢推进, 越接近 0.95 越慢, 营造"正在工作"感
     _fakeTicker = Timer.periodic(const Duration(milliseconds: 800), (_) {
@@ -97,31 +99,36 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   Future<void> _poll(String taskId) async {
     final api = ref.read(apiClientProvider);
-    for (var i = 0; i < 120; i++) {
-      await Future<void>.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-      try {
-        final st = await api.uploadTaskStatus(taskId);
-        final status = st['status'] as String? ?? '';
-        setState(() {
-          // 统一展示"专属 Wiki 生成中", 不暴露内部阶段数字
+    try {
+      for (var i = 0; i < 120; i++) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        try {
+          final st = await api.uploadTaskStatus(taskId);
+          final status = st['status'] as String? ?? '';
+          setState(() {
+            // 统一展示"专属 Wiki 生成中", 不暴露内部阶段数字
+            if (status == 'done' || status == 'failed' || status == 'cancelled') {
+              _status = _statusText(status);
+            } else {
+              _status = '专属 Wiki 生成中';
+            }
+            _progressText = '';
+          });
           if (status == 'done' || status == 'failed' || status == 'cancelled') {
-            _status = _statusText(status);
-          } else {
-            _status = '专属 Wiki 生成中';
+            _stopFakeProgress(complete: status == 'done');
+            setState(() => _lastResult = st);
+            // 导入完成/失败后通知知识库列表刷新
+            ref.read(dataRefreshProvider.notifier).state++;
+            return;
           }
-          _progressText = '';
-        });
-        if (status == 'done' || status == 'failed' || status == 'cancelled') {
-          _stopFakeProgress(complete: status == 'done');
-          setState(() => _lastResult = st);
-          // 导入完成/失败后通知知识库列表刷新
-          ref.read(dataRefreshProvider.notifier).state++;
-          return;
+        } catch (_) {
+          // 轮询失败继续重试
         }
-      } catch (_) {
-        // 轮询失败继续重试
       }
+    } finally {
+      // 兜底: 轮询超时/异常退出时也停掉假进度 timer, 避免泄漏
+      _stopFakeProgress();
     }
   }
 

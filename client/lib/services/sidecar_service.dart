@@ -104,6 +104,14 @@ class SidecarService {
       return SidecarStartResult(true, false, '非 Windows 平台,跳过 sidecar');
     }
     if (await isBackendRunning()) {
+      // 后端已在跑: 记录监听 8000 的进程 PID, 便于 stopSidecar 主动停止
+      try {
+        final pids = await _pidsListeningOnPort(8000);
+        if (pids.isNotEmpty) {
+          _pid = pids.first;
+          _startedByUs = false; // 非本实例拉起的进程, 但可主动停止
+        }
+      } catch (_) {}
       return SidecarStartResult(true, false, '后端已在运行');
     }
     final exe = await resolveSidecarExe();
@@ -178,18 +186,59 @@ class SidecarService {
     return SidecarStartResult(false, true, '后端启动超时(40s),请查看 logs/ 目录');
   }
 
-  /// 停止由本客户端拉起的后端进程。
+  /// 停止由本客户端拉起的后端进程; 并尽力停掉占用 8000 端口的后端。
+  ///
+  /// 直接 kill `_pid` 只结束 PyInstaller 引导进程, 真正监听 8000 的
+  /// 是它派生的子进程; 因此这里用 netstat 找监听 8000 的进程再 taskkill。
+  /// 若后端不是本客户端拉起的(如开机自启/上次残留), 同样能停掉。
   Future<void> stopSidecar() async {
     if (!isWindows) return;
+    // 1) 结束本实例拉起的引导进程(若还在)
     final pid = _pid;
     if (pid != null) {
       try {
         Process.killPid(pid);
       } catch (_) {}
     }
+    // 2) 按端口找监听 8000 的进程并强杀(覆盖子进程/非本实例拉起的后端)
+    try {
+      final pids = await _pidsListeningOnPort(8000);
+      for (final p in pids) {
+        try {
+          await Process.run('taskkill', ['/F', '/PID', '$p'], runInShell: true);
+          AppLogger.log('sidecar 已停止端口 8000 的进程 PID=$p');
+        } catch (_) {}
+      }
+    } catch (_) {}
     _process = null;
     _pid = null;
     _startedByUs = false;
+  }
+
+  /// 用 netstat 查监听指定端口的进程 PID 列表(Windows)。
+  Future<List<int>> _pidsListeningOnPort(int port) async {
+    final result = await Process.run(
+      'netstat',
+      ['-ano', '-p', 'tcp'],
+      runInShell: true,
+    );
+    final stdout = (result.stdout as String?) ?? '';
+    final pids = <int>{};
+    for (final line in stdout.split('\n')) {
+      // 匹配形如: TCP 127.0.0.1:8000 0.0.0.0:0 LISTENING 12345
+      if (!line.contains('LISTENING')) continue;
+      final match = RegExp(
+        r'[:\s]' + port.toString() + r'\s+\S+\s+LISTENING\s+(\d+)\s*$',
+      ).hasMatch(line);
+      if (match) {
+        final m = RegExp(r'LISTENING\s+(\d+)\s*$').firstMatch(line.trim());
+        if (m != null) {
+          final pid = int.tryParse(m.group(1)!);
+          if (pid != null && pid > 0) pids.add(pid);
+        }
+      }
+    }
+    return pids.toList();
   }
 
   bool get startedByUs => _startedByUs;
