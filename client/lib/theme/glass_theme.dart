@@ -14,15 +14,18 @@ class GlassTheme {
   // ── 主色: 蓝紫渐变 (iOS 风格) ──────────────────────
   static const Color primary = Color(0xFF3B82F6);
   static const Color accent = Color(0xFF8B5CF6);
+  static const Color pinkGlow = Color(0xFFEC4899);
 
+  /// 浅色背景: 更饱和的蓝紫渐变, 让毛玻璃有内容可模糊。
   static LinearGradient get backgroundGradient => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFFEFF6FF),
-          Color(0xFFF5F3FF),
-          Color(0xFFFDF2F8),
+          Color(0xFFDBEAFE), // 亮蓝
+          Color(0xFFE9D5FF), // 淡紫
+          Color(0xFFFCE7F3), // 淡粉
         ],
+        stops: [0.0, 0.55, 1.0],
       );
 
   static LinearGradient get darkBackgroundGradient => const LinearGradient(
@@ -30,18 +33,22 @@ class GlassTheme {
         end: Alignment.bottomRight,
         colors: [
           Color(0xFF0B1220),
-          Color(0xFF111827),
-          Color(0xFF1E1B2E),
+          Color(0xFF1E1B4B),
+          Color(0xFF2E1065),
         ],
+        stops: [0.0, 0.55, 1.0],
       );
 
-  /// 毛玻璃卡片包装: BackdropFilter 模糊 + 半透明填充 + 0.5px 细描边。
+  /// 毛玻璃卡片包装: BackdropFilter 模糊 + 半透明填充 + 细描边 + 顶部高光。
+  ///
+  /// opacity 偏低 (默认 0.38) 让背景色彩透出, 配合 blur 呈现玻璃质感;
+  /// 顶部一条半透明白色渐变模拟 iOS 玻璃面板的高光。
   static Widget glassCard({
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(16),
     BorderRadius radius = const BorderRadius.all(Radius.circular(20)),
-    double blur = 24,
-    double opacity = 0.55,
+    double blur = 28,
+    double opacity = 0.45,
     Color? borderColor,
   }) {
     return ClipRRect(
@@ -54,8 +61,19 @@ class GlassTheme {
             color: Colors.white.withValues(alpha: opacity),
             borderRadius: radius,
             border: Border.all(
-              color: borderColor ?? Colors.white.withValues(alpha: 0.5),
+              color: borderColor ?? Colors.white.withValues(alpha: 0.6),
               width: 0.5,
+            ),
+            // 顶部高光: 模拟 iOS 玻璃面板的反光条
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withValues(alpha: 0.35),
+                Colors.white.withValues(alpha: 0.10),
+                Colors.white.withValues(alpha: 0.04),
+              ],
+              stops: const [0.0, 0.25, 1.0],
             ),
           ),
           child: child,
@@ -66,7 +84,8 @@ class GlassTheme {
 
   /// 页面渐变背景 (配合 Scaffold 使用)。
   ///
-  /// 模拟 iOS 壁纸: 线性渐变打底 + 从中心/角落散开的径向辉光光斑。
+  /// 模拟 iOS 壁纸: 线性渐变打底 + 多个强径向辉光光斑,
+  /// 光斑要足够明显, 毛玻璃卡片模糊时才有可见的"玻璃感"。
   static Widget background(BuildContext context, {required Widget child}) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
@@ -76,34 +95,36 @@ class GlassTheme {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 径向辉光光斑 (大范围径向模糊感)
+          // 大半径径向辉光 (alpha 提高, 光斑明显)
           Positioned(
-            top: -120,
-            right: -80,
+            top: -140,
+            right: -100,
             child: _glowOrb(
-              dark
-                  ? const Color(0x333B82F6)
-                  : const Color(0x553B82F6),
+              dark ? const Color(0x663B82F6) : const Color(0x8C3B82F6),
+              size: 460,
+            ),
+          ),
+          Positioned(
+            bottom: -160,
+            left: -80,
+            child: _glowOrb(
+              dark ? const Color(0x668B5CF6) : const Color(0x8C8B5CF6),
               size: 420,
             ),
           ),
           Positioned(
-            bottom: -140,
-            left: -60,
+            top: 200,
+            left: -140,
             child: _glowOrb(
-              dark
-                  ? const Color(0x228B5CF6)
-                  : const Color(0x448B5CF6),
-              size: 380,
+              dark ? const Color(0x55EC4899) : const Color(0x73EC4899),
+              size: 340,
             ),
           ),
           Positioned(
-            top: 240,
-            left: -120,
+            bottom: 100,
+            right: -120,
             child: _glowOrb(
-              dark
-                  ? const Color(0x1FEC4899)
-                  : const Color(0x33EC4899),
+              dark ? const Color(0x4438BDF8) : const Color(0x6638BDF8),
               size: 300,
             ),
           ),
