@@ -41,8 +41,8 @@ class GlassTheme {
 
   /// 毛玻璃卡片包装: BackdropFilter 模糊 + 半透明填充 + 细描边 + 顶部高光。
   ///
-  /// opacity 偏低 (默认 0.38) 让背景色彩透出, 配合 blur 呈现玻璃质感;
-  /// 顶部一条半透明白色渐变模拟 iOS 玻璃面板的高光。
+  /// 自动感知深浅模式: 浅色用白色半透明玻璃, 深色用黑色半透明玻璃,
+  /// 保证文字对比度 (深色模式下浅色文字在深色卡片上)。
   static Widget glassCard({
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(16),
@@ -50,7 +50,13 @@ class GlassTheme {
     double blur = 28,
     double opacity = 0.45,
     Color? borderColor,
+    Brightness? brightness,
   }) {
+    final dark = brightness == Brightness.dark
+        ? true
+        : WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+            Brightness.dark;
+    final cardColor = dark ? Colors.black : Colors.white;
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
@@ -58,10 +64,10 @@ class GlassTheme {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: opacity),
+            color: cardColor.withValues(alpha: opacity),
             borderRadius: radius,
             border: Border.all(
-              color: borderColor ?? Colors.white.withValues(alpha: 0.6),
+              color: borderColor ?? cardColor.withValues(alpha: 0.6),
               width: 0.5,
             ),
             // 顶部高光: 模拟 iOS 玻璃面板的反光条
@@ -69,9 +75,9 @@ class GlassTheme {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.white.withValues(alpha: 0.35),
-                Colors.white.withValues(alpha: 0.10),
-                Colors.white.withValues(alpha: 0.04),
+                cardColor.withValues(alpha: dark ? 0.18 : 0.35),
+                cardColor.withValues(alpha: dark ? 0.06 : 0.10),
+                cardColor.withValues(alpha: dark ? 0.02 : 0.04),
               ],
               stops: const [0.0, 0.25, 1.0],
             ),
