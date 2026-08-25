@@ -16,14 +16,14 @@ class GlassTheme {
   static const Color accent = Color(0xFF8B5CF6);
   static const Color pinkGlow = Color(0xFFEC4899);
 
-  /// 浅色背景: 更饱和的蓝紫渐变, 让毛玻璃有内容可模糊。
+  /// 浅色背景: 蓝紫渐变, 明度较之前降低约 45% (更沉静, 衬出玻璃卡片)。
   static LinearGradient get backgroundGradient => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFFDBEAFE), // 亮蓝
-          Color(0xFFE9D5FF), // 淡紫
-          Color(0xFFFCE7F3), // 淡粉
+          Color(0xFF93B8F0), // 中蓝 (原 0xFFDBEAFE 降明度)
+          Color(0xFFA58FE8), // 中紫 (原 0xFFE9D5FF 降明度)
+          Color(0xFFD0A0D8), // 中粉 (原 0xFFFCE7F3 降明度)
         ],
         stops: [0.0, 0.55, 1.0],
       );
@@ -43,6 +43,8 @@ class GlassTheme {
   ///
   /// 自动感知深浅模式: 浅色用白色半透明玻璃, 深色用黑色半透明玻璃,
   /// 保证文字对比度 (深色模式下浅色文字在深色卡片上)。
+  /// [blur] 传 0 时跳过 BackdropFilter(纯半透明), 用于滚动列表等
+  /// 高频重建场景, 避免大量模糊层导致卡顿。
   static Widget glassCard({
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(16),
@@ -57,34 +59,66 @@ class GlassTheme {
         : WidgetsBinding.instance.platformDispatcher.platformBrightness ==
             Brightness.dark;
     final cardColor = dark ? Colors.black : Colors.white;
+    final surface = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: cardColor.withValues(alpha: opacity),
+        borderRadius: radius,
+        border: Border.all(
+          color: borderColor ?? cardColor.withValues(alpha: 0.6),
+          width: 0.5,
+        ),
+        // 顶部高光: 模拟 iOS 玻璃面板的反光条
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            cardColor.withValues(alpha: dark ? 0.18 : 0.35),
+            cardColor.withValues(alpha: dark ? 0.06 : 0.10),
+            cardColor.withValues(alpha: dark ? 0.02 : 0.04),
+          ],
+          stops: const [0.0, 0.25, 1.0],
+        ),
+      ),
+      child: child,
+    );
+    if (blur <= 0) return surface;
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: cardColor.withValues(alpha: opacity),
-            borderRadius: radius,
-            border: Border.all(
-              color: borderColor ?? cardColor.withValues(alpha: 0.6),
-              width: 0.5,
-            ),
-            // 顶部高光: 模拟 iOS 玻璃面板的反光条
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                cardColor.withValues(alpha: dark ? 0.18 : 0.35),
-                cardColor.withValues(alpha: dark ? 0.06 : 0.10),
-                cardColor.withValues(alpha: dark ? 0.02 : 0.04),
-              ],
-              stops: const [0.0, 0.25, 1.0],
-            ),
-          ),
-          child: child,
+        child: surface,
+      ),
+    );
+  }
+
+  /// 列表项轻量玻璃容器 — 无 BackdropFilter, 仅半透明 + 细描边。
+  ///
+  /// 用于 ListView.builder 等高频重建场景: 视觉与 [glassCard] 几乎一致,
+  /// 但零模糊开销, 滚动不再卡顿。
+  static Widget glassTile({
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.all(12),
+    BorderRadius radius = const BorderRadius.all(Radius.circular(14)),
+    double opacity = 0.35,
+    Brightness? brightness,
+  }) {
+    final dark = brightness == Brightness.dark
+        ? true
+        : WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+            Brightness.dark;
+    final cardColor = dark ? Colors.black : Colors.white;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: cardColor.withValues(alpha: opacity),
+        borderRadius: radius,
+        border: Border.all(
+          color: cardColor.withValues(alpha: dark ? 0.15 : 0.4),
+          width: 0.5,
         ),
       ),
+      child: child,
     );
   }
 
@@ -106,7 +140,7 @@ class GlassTheme {
             top: -140,
             right: -100,
             child: _glowOrb(
-              dark ? const Color(0x663B82F6) : const Color(0x8C3B82F6),
+              dark ? const Color(0x663B82F6) : const Color(0x703B82F6),
               size: 460,
             ),
           ),
@@ -114,7 +148,7 @@ class GlassTheme {
             bottom: -160,
             left: -80,
             child: _glowOrb(
-              dark ? const Color(0x668B5CF6) : const Color(0x8C8B5CF6),
+              dark ? const Color(0x668B5CF6) : const Color(0x668B5CF6),
               size: 420,
             ),
           ),
@@ -122,7 +156,7 @@ class GlassTheme {
             top: 200,
             left: -140,
             child: _glowOrb(
-              dark ? const Color(0x55EC4899) : const Color(0x73EC4899),
+              dark ? const Color(0x55EC4899) : const Color(0x59EC4899),
               size: 340,
             ),
           ),
@@ -130,7 +164,7 @@ class GlassTheme {
             bottom: 100,
             right: -120,
             child: _glowOrb(
-              dark ? const Color(0x4438BDF8) : const Color(0x6638BDF8),
+              dark ? const Color(0x4438BDF8) : const Color(0x4D38BDF8),
               size: 300,
             ),
           ),

@@ -493,7 +493,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
               ),
               child: bubbleContent,
             )
-          : GlassTheme.glassCard(
+          : GlassTheme.glassTile(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               radius: const BorderRadius.all(Radius.circular(14)),
               opacity: 0.5,

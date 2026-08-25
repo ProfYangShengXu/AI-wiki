@@ -382,7 +382,8 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: SpringPress(
                         onTap: () => _open(card),
-                        child: GlassTheme.glassCard(
+                        // 列表项用轻量玻璃容器(无 BackdropFilter), 滚动不卡顿
+                        child: GlassTheme.glassTile(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           radius: const BorderRadius.all(Radius.circular(14)),
                           child: ListTile(

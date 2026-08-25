@@ -217,7 +217,7 @@ class _QuizPageState extends ConsumerState<QuizPage> {
               final controller = _controllerFor(question);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: GlassTheme.glassCard(
+                child: GlassTheme.glassTile(
                   padding: const EdgeInsets.all(12),
                   radius: const BorderRadius.all(Radius.circular(16)),
                   child: Column(
