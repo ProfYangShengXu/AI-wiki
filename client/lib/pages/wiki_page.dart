@@ -380,30 +380,27 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                     final card = filtered[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: SpringPress(
-                        onTap: () => _open(card),
-                        // 列表项用轻量玻璃容器(无 BackdropFilter), 滚动不卡顿
-                        child: GlassTheme.glassTile(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          radius: const BorderRadius.all(Radius.circular(14)),
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              card.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              card.sourceFile.isNotEmpty
-                                  ? '${card.category} · ${card.sourceFile}'
-                                  : card.category,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            selected: _selected?.id == card.id,
-                            onTap: () {},
+                      // 列表项: 直接用 ListTile.onTap 处理点击(避免双层手势竞争)
+                      child: GlassTheme.glassTile(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        radius: const BorderRadius.all(Radius.circular(14)),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            card.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
+                          subtitle: Text(
+                            card.sourceFile.isNotEmpty
+                                ? '${card.category} · ${card.sourceFile}'
+                                : card.category,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          selected: _selected?.id == card.id,
+                          onTap: () => _open(card),
                         ),
                       ),
                     );

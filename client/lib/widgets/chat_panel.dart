@@ -359,17 +359,24 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         if (widget.showModeToggle)
           Padding(
             padding: const EdgeInsets.all(8),
-            // 模式切换器: 毛玻璃浮层(用户指定的半透明组件场景)
-            child: GlassTheme.glassCard(
+            // 模式切换器: 半透明浮层容器(避免 BackdropFilter 在 Windows
+            // 上干扰子控件命中测试, 保证切换可点)
+            child: Container(
               padding: const EdgeInsets.all(4),
-              radius: const BorderRadius.all(Radius.circular(12)),
-              blur: 20,
-              opacity: 0.5,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  width: 0.5,
+                ),
+              ),
               child: SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'ask', label: Text('Ask')),
@@ -433,10 +440,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                 ),
               ),
               const SizedBox(width: 8),
-              SpringPress(
-                onTap: _send,
-                child: FilledButton(onPressed: _send, child: const Text('发送')),
-              ),
+              FilledButton(onPressed: _send, child: const Text('发送')),
             ],
           ),
         ),
