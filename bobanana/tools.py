@@ -479,9 +479,23 @@ def _providers() -> list[str]:
 def _construct_llm(provider: str):
     """按 provider 名构造 LLM 实例。构造失败/无凭据时返回 None。"""
     from bobanana.config import (
+        ANTHROPIC_API_KEY,
+        ANTHROPIC_BASE_URL,
+        ANTHROPIC_MODEL,
         DEEPSEEK_API_KEY,
         DEEPSEEK_BASE_URL,
         DEEPSEEK_MODEL,
+        GEMINI_API_KEY,
+        GEMINI_MODEL,
+        GLM_API_KEY,
+        GLM_BASE_URL,
+        GLM_MODEL,
+        GROK_API_KEY,
+        GROK_BASE_URL,
+        GROK_MODEL,
+        KIMI_API_KEY,
+        KIMI_BASE_URL,
+        KIMI_MODEL,
         LLM_TEMPERATURE,
         OLLAMA_BASE_URL,
         OLLAMA_MODEL,
@@ -513,6 +527,73 @@ def _construct_llm(provider: str):
             temperature=LLM_TEMPERATURE,
             api_key=OPENAI_API_KEY,
             base_url=OPENAI_BASE_URL,
+        )
+    if provider == "kimi":
+        # Kimi (Moonshot) — OpenAI 兼容
+        from langchain_openai import ChatOpenAI
+        if not KIMI_API_KEY:
+            logger.debug("Kimi 无 API Key, 跳过")
+            return None
+        return ChatOpenAI(
+            model=KIMI_MODEL,
+            temperature=LLM_TEMPERATURE,
+            api_key=KIMI_API_KEY,
+            base_url=KIMI_BASE_URL,
+        )
+    if provider == "glm":
+        # GLM (智谱) — OpenAI 兼容
+        from langchain_openai import ChatOpenAI
+        if not GLM_API_KEY:
+            logger.debug("GLM 无 API Key, 跳过")
+            return None
+        return ChatOpenAI(
+            model=GLM_MODEL,
+            temperature=LLM_TEMPERATURE,
+            api_key=GLM_API_KEY,
+            base_url=GLM_BASE_URL,
+        )
+    if provider == "grok":
+        # Grok (xAI) — OpenAI 兼容
+        from langchain_openai import ChatOpenAI
+        if not GROK_API_KEY:
+            logger.debug("Grok 无 API Key, 跳过")
+            return None
+        return ChatOpenAI(
+            model=GROK_MODEL,
+            temperature=LLM_TEMPERATURE,
+            api_key=GROK_API_KEY,
+            base_url=GROK_BASE_URL,
+        )
+    if provider == "anthropic":
+        # Anthropic (Claude) — 独立 SDK
+        try:
+            from langchain_anthropic import ChatAnthropic
+        except Exception:
+            logger.debug("langchain-anthropic 未安装, 跳过 Anthropic")
+            return None
+        if not ANTHROPIC_API_KEY:
+            logger.debug("Anthropic 无 API Key, 跳过")
+            return None
+        return ChatAnthropic(
+            model=ANTHROPIC_MODEL,
+            temperature=LLM_TEMPERATURE,
+            api_key=ANTHROPIC_API_KEY,
+            base_url=ANTHROPIC_BASE_URL,
+        )
+    if provider == "gemini":
+        # Gemini (Google) — 独立 SDK
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+        except Exception:
+            logger.debug("langchain-google-genai 未安装, 跳过 Gemini")
+            return None
+        if not GEMINI_API_KEY:
+            logger.debug("Gemini 无 API Key, 跳过")
+            return None
+        return ChatGoogleGenerativeAI(
+            model=GEMINI_MODEL,
+            temperature=LLM_TEMPERATURE,
+            api_key=GEMINI_API_KEY,
         )
     if provider == "ollama":
         try:

@@ -151,8 +151,22 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
         });
         break;
       case WsEvent.typeResponse:
+        // 流式(delta)已拼出回答时, response 是完整文本 → 更新当前消息,
+        // 避免同一条回答重复出现两次。
         setState(() {
-          _messages.add(_ChatItem(role: 'assistant', text: event.content));
+          final content = event.content;
+          var updated = false;
+          if (_currentAssistant >= 0 && _currentAssistant < _messages.length) {
+            final item = _messages[_currentAssistant];
+            if (item.role == 'assistant' && item.streaming) {
+              _messages[_currentAssistant] =
+                  item.copyWith(text: content, streaming: false);
+              updated = true;
+            }
+          }
+          if (!updated) {
+            _messages.add(_ChatItem(role: 'assistant', text: content));
+          }
         });
         break;
       case WsEvent.typeProgress:
@@ -365,26 +379,37 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
         if (widget.showModeToggle)
           Padding(
             padding: const EdgeInsets.all(8),
-            // 模式切换器: 半透明浮层容器(避免 BackdropFilter 在 Windows
-            // 上干扰子控件命中测试, 保证切换可点)
+            // 模式切换器: 半透明浮层容器, 两个独立可点按钮
+            // (SegmentedButton 在某些 Windows/窄容器下有命中测试问题)
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
                   width: 0.5,
                 ),
               ),
-              child: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'ask', label: Text('Ask')),
-                  ButtonSegment(value: 'agent', label: Text('Agent')),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ModeButton(
+                      label: 'Ask',
+                      active: _mode == 'ask',
+                      activeColor: theme.colorScheme.primary,
+                      onTap: () => setState(() => _mode = 'ask'),
+                    ),
+                  ),
+                  Expanded(
+                    child: _ModeButton(
+                      label: 'Agent',
+                      active: _mode == 'agent',
+                      activeColor: theme.colorScheme.primary,
+                      onTap: () => setState(() => _mode = 'agent'),
+                    ),
+                  ),
                 ],
-                selected: {_mode},
-                onSelectionChanged: (values) =>
-                    setState(() => _mode = values.first),
               ),
             ),
           ),
@@ -548,6 +573,50 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 模式切换按钮 — 简单可点的激活态按钮 (替代 SegmentedButton,
+/// 避免其命中测试问题)。
+class _ModeButton extends StatelessWidget {
+  const _ModeButton({
+    required this.label,
+    required this.active,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: active ? activeColor : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurfaceVariant,
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

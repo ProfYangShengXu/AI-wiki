@@ -40,11 +40,48 @@ PROVIDERS = {
         "default_base_url": "https://api.openai.com/v1",
         "default_model": "gpt-4o-mini",
     },
+    "kimi": {
+        "key_env": "KIMI_API_KEY",
+        "model_env": "KIMI_MODEL",
+        "base_url_env": "KIMI_BASE_URL",
+        "default_base_url": "https://api.moonshot.cn/v1",
+        "default_model": "moonshot-v1-8k",
+    },
+    "glm": {
+        "key_env": "GLM_API_KEY",
+        "model_env": "GLM_MODEL",
+        "base_url_env": "GLM_BASE_URL",
+        "default_base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "default_model": "glm-4-flash",
+    },
+    "grok": {
+        "key_env": "GROK_API_KEY",
+        "model_env": "GROK_MODEL",
+        "base_url_env": "GROK_BASE_URL",
+        "default_base_url": "https://api.x.ai/v1",
+        "default_model": "grok-3-mini",
+    },
+    "anthropic": {
+        "key_env": "ANTHROPIC_API_KEY",
+        "model_env": "ANTHROPIC_MODEL",
+        "base_url_env": "ANTHROPIC_BASE_URL",
+        "default_base_url": "https://api.anthropic.com",
+        "default_model": "claude-sonnet-4-5",
+    },
+    "gemini": {
+        "key_env": "GEMINI_API_KEY",
+        "model_env": "GEMINI_MODEL",
+        "base_url_env": "GEMINI_BASE_URL",
+        "default_base_url": "",
+        "default_model": "gemini-2.0-flash",
+    },
 }
+
+_ALL_PROVIDER_IDS = "|".join(PROVIDERS.keys())
 
 
 class BootstrapConfigRequest(BaseModel):
-    provider: str = Field(default="deepseek", pattern="^(deepseek|openai)$")
+    provider: str = Field(default="deepseek", pattern=f"^({_ALL_PROVIDER_IDS})$")
     api_key: str = Field(..., min_length=8, max_length=512)
     base_url: str = Field(default="", max_length=512)
     model: str = Field(default="", max_length=128)
@@ -60,11 +97,11 @@ def _mask_key(api_key: str) -> str:
 
 
 def _provider_has_key(provider: str) -> bool:
-    """当前供应商必须拥有有效 Key，避免用 OpenAI Key 冒充 DeepSeek。"""
-    if provider == "openai":
-        key = (config.OPENAI_API_KEY or "").strip()
-    else:
-        key = (config.DEEPSEEK_API_KEY or "").strip()
+    """当前供应商必须拥有有效 Key，避免跨厂商 Key 混用。"""
+    info = PROVIDERS.get(provider)
+    if info is None:
+        return False
+    key = (getattr(config, info["key_env"], "") or "").strip()
     return key.lower() not in _PLACEHOLDER_KEYS
 
 
@@ -93,15 +130,18 @@ def _current_provider() -> str:
 
 
 def _provider_key_tail(provider: str) -> str:
-    if provider == "openai":
-        return _mask_key(config.OPENAI_API_KEY or "")
-    return _mask_key(config.DEEPSEEK_API_KEY or "")
+    info = PROVIDERS.get(provider)
+    if info is None:
+        return ""
+    return _mask_key(getattr(config, info["key_env"], "") or "")
 
 
 def _provider_base_url(provider: str) -> str:
-    if provider == "openai":
-        return config.OPENAI_BASE_URL or PROVIDERS["openai"]["default_base_url"]
-    return config.DEEPSEEK_BASE_URL or PROVIDERS["deepseek"]["default_base_url"]
+    info = PROVIDERS.get(provider)
+    if info is None:
+        return ""
+    env_val = getattr(config, info["base_url_env"], "") or ""
+    return env_val or info.get("default_base_url", "")
 
 
 @router.get("/status", response_model=ApiResponse)

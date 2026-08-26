@@ -95,6 +95,26 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                             value: 'openai',
                             child: Text('OpenAI'),
                           ),
+                          DropdownMenuItem(
+                            value: 'kimi',
+                            child: Text('Kimi (月之暗面)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'glm',
+                            child: Text('GLM (智谱)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'grok',
+                            child: Text('Grok (xAI)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'anthropic',
+                            child: Text('Claude (Anthropic)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'gemini',
+                            child: Text('Gemini (Google)'),
+                          ),
                         ],
                         onChanged: _busy
                             ? null
@@ -102,14 +122,10 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                                 if (value == null) return;
                                 setState(() {
                                   _provider = value;
-                                  _model = value == 'openai'
-                                      ? 'gpt-4o-mini'
-                                      : 'deepseek-v4-flash';
+                                  final defaults = _providerDefaults(value);
+                                  _model = defaults.$1;
                                   if (_baseUrlController.text.isEmpty) {
-                                    _baseUrlController.text =
-                                        value == 'openai'
-                                            ? 'https://api.openai.com/v1'
-                                            : 'https://api.deepseek.com';
+                                    _baseUrlController.text = defaults.$2;
                                   }
                                 });
                               },
@@ -218,6 +234,26 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
         ),
       ),
     );
+  }
+
+  /// 各厂商默认 (model, base_url) — 与后端 config/bootstrap 保持一致。
+  (String, String) _providerDefaults(String provider) {
+    switch (provider) {
+      case 'openai':
+        return ('gpt-4o-mini', 'https://api.openai.com/v1');
+      case 'kimi':
+        return ('moonshot-v1-8k', 'https://api.moonshot.cn/v1');
+      case 'glm':
+        return ('glm-4-flash', 'https://open.bigmodel.cn/api/paas/v4');
+      case 'grok':
+        return ('grok-3-mini', 'https://api.x.ai/v1');
+      case 'anthropic':
+        return ('claude-sonnet-4-5', 'https://api.anthropic.com');
+      case 'gemini':
+        return ('gemini-2.0-flash', '');
+      default:
+        return ('deepseek-v4-flash', 'https://api.deepseek.com');
+    }
   }
 
   Widget _label(String text) {

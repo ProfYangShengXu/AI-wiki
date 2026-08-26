@@ -25,7 +25,7 @@ LOGS_DIR = DATA_DIR / "logs"
 load_dotenv(dotenv_path=ENV_FILE)
 
 # ── LLM 配置 ─────────────────────────────────────────────────
-LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai | ollama | deepseek
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai | ollama | deepseek | kimi | glm | grok | anthropic | gemini
 # 降级链: 逗号分隔, 按顺序尝试 (Phase 2)
 LLM_PROVIDERS: str = os.getenv("LLM_PROVIDERS", "deepseek,openai,ollama")
 OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
@@ -37,6 +37,27 @@ OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3")
 DEEPSEEK_API_KEY: str | None = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+
+# ── 多厂商 LLM (OpenAI 兼容 + 独立 SDK) ────────────────────
+# Kimi (Moonshot) — OpenAI 兼容
+KIMI_API_KEY: str | None = os.getenv("KIMI_API_KEY")
+KIMI_BASE_URL: str = os.getenv("KIMI_BASE_URL", "https://api.moonshot.cn/v1")
+KIMI_MODEL: str = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
+# GLM (智谱) — OpenAI 兼容
+GLM_API_KEY: str | None = os.getenv("GLM_API_KEY")
+GLM_BASE_URL: str = os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
+GLM_MODEL: str = os.getenv("GLM_MODEL", "glm-4-flash")
+# Grok (xAI) — OpenAI 兼容
+GROK_API_KEY: str | None = os.getenv("GROK_API_KEY")
+GROK_BASE_URL: str = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")
+GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-3-mini")
+# Anthropic (Claude) — 独立 SDK
+ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_BASE_URL: str = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+# Gemini (Google) — 独立 SDK
+GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.1"))
 LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "4096"))

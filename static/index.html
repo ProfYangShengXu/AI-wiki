@@ -213,8 +213,12 @@ main{overflow-y:auto;padding:var(--pico-spacing)}
 <label for="bsProvider">Provider</label>
 <select id="bsProvider" onchange="A.bsProviderChanged()">
 <option value="deepseek">DeepSeek</option>
-
 <option value="openai">OpenAI</option>
+<option value="kimi">Kimi (月之暗面)</option>
+<option value="glm">GLM (智谱)</option>
+<option value="grok">Grok (xAI)</option>
+<option value="anthropic">Claude (Anthropic)</option>
+<option value="gemini">Gemini (Google)</option>
 </select>
 <label for="bsKey">API Key</label>
 <div style="display:flex;gap:6px">
@@ -255,7 +259,7 @@ async startApp(){await this.loadKB();await this.load();await this.wsConnect()},
 showBootstrap(){const m=$('bootstrapMask');if(m){m.style.display='flex';m.style.alignItems='center';m.style.justifyContent='center'}this.bsSetStatus('请填写 API Key 并完成验证',false)},
 hideBootstrap(){const m=$('bootstrapMask');if(m)m.style.display='none'},
 bsSetStatus(msg,isError){const s=$('bsStatus');if(!s)return;s.textContent=msg||'';s.className=isError?'error':((msg&&(msg.startsWith('连接成功')||msg.startsWith('配置成功')))?'ok':'')},
-bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const base=$('bsBaseUrl');if(base&&!base.value)base.value=p==='openai'?'https://api.openai.com/v1':'https://api.deepseek.com';const m=$('bsModel');if(m){if(p==='openai')m.value='gpt-4o-mini';else m.value='deepseek-v4-flash'};return p},
+bsApplyProvider(){const p=$('bsProvider')?.value||this.bootstrap.provider||'deepseek';this.bootstrap.provider=p;const defaults={deepseek:{base:'https://api.deepseek.com',model:'deepseek-v4-flash'},openai:{base:'https://api.openai.com/v1',model:'gpt-4o-mini'},kimi:{base:'https://api.moonshot.cn/v1',model:'moonshot-v1-8k'},glm:{base:'https://open.bigmodel.cn/api/paas/v4',model:'glm-4-flash'},grok:{base:'https://api.x.ai/v1',model:'grok-3-mini'},anthropic:{base:'https://api.anthropic.com',model:'claude-sonnet-4-5'},gemini:{base:'',model:'gemini-2.0-flash'}};const d=defaults[p]||defaults.deepseek;const base=$('bsBaseUrl');if(base&&!base.value)base.value=d.base;const m=$('bsModel');if(m)m.value=d.model;return p},
 bsProviderChanged(){this.bsApplyProvider();this.bsSetStatus('',false)},
 bsToggleKey(){const k=$('bsKey');if(!k)return;k.type=k.type==='password'?'text':'password'},
 bsPayload(){return{provider:this.bsApplyProvider(),api_key:$('bsKey').value.trim(),base_url:$('bsBaseUrl').value.trim(),model:($('bsModel')?.value||'deepseek-v4-flash').trim()}},
