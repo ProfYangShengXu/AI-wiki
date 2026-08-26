@@ -22,11 +22,12 @@ class _HomeShellState extends State<HomeShell> {
 
   static const _titles = ['知识库', '对话', '导入', 'Quiz', '设置'];
   late final List<Widget> _pages = [
-    WikiPage(reloadNotifier: _wikiReload),
-    const ChatPage(),
-    const UploadPage(),
-    const QuizPage(),
-    const SettingsPage(),
+    // 每页独立 RepaintBoundary: 单页动效/滚动时, 其余页面不再参与整树重绘
+    RepaintBoundary(child: WikiPage(reloadNotifier: _wikiReload)),
+    const RepaintBoundary(child: ChatPage()),
+    const RepaintBoundary(child: UploadPage()),
+    const RepaintBoundary(child: QuizPage()),
+    const RepaintBoundary(child: SettingsPage()),
   ];
 
   @override

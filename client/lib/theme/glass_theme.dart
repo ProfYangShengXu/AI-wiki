@@ -115,15 +115,18 @@ class GlassTheme {
   ///
   /// 渐变底 + 预渲染辉光: 光斑用 CustomPainter 画进画布(只画一次),
   /// 不参与命中测试(无 Stack/Positioned 覆盖层), 按钮交互不受影响。
+  /// 外层 RepaintBoundary: 内容动画/滚动时背景层不再参与整树重绘。
   static Widget background(BuildContext context, {required Widget child}) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: dark ? darkBackgroundGradient : backgroundGradient,
-      ),
-      child: CustomPaint(
-        painter: _GlowPainter(dark: dark),
-        child: child,
+    return RepaintBoundary(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: dark ? darkBackgroundGradient : backgroundGradient,
+        ),
+        child: CustomPaint(
+          painter: _GlowPainter(dark: dark),
+          child: child,
+        ),
       ),
     );
   }

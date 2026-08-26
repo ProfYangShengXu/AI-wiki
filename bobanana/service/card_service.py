@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 
 from bobanana.config import RETRIEVAL_TOP_K
-from bobanana.database import db_manager
+from bobanana.database import PLACEHOLDER_CONTENT, db_manager
 from bobanana.models import CardCreate, CardUpdate, ImportResult, KnowledgeCard
 from bobanana.tools import embed_text
 
@@ -163,36 +163,64 @@ class CardService:
                 except Exception as e:
                     result.failed.append({"title": card.title, "reason": str(e)})
                     self._pending_fails.append({"title": card.title, "reason": str(e)})
-        # 锁外统一做关联检测
-        for card_resp in result.success:
-            try:
-                cid = card_resp.id if hasattr(card_resp, 'id') else ''
-                if cid:
-                    linked_card = db_manager.get_card(cid)
-                    if linked_card:
-                        await self._detect_and_link(cid, linked_card)
-            except Exception:
-                pass
+        # 锁外统一做关联检测: 全库快照一次, 批量匹配(替代每卡一次全量 get)
+        batch_ids = [
+            r.id for r in result.success if hasattr(r, "id") and r.id
+        ]
+        try:
+            await self._detect_and_link_many(batch_ids)
+        except Exception:  # noqa: BLE001
+            pass
         logger.info("批量导入: %d 成功, %d 失败", len(result.success), len(result.failed))
         return result
 
     # ── 关联检测 ─────────────────────────────────────────
 
     async def _detect_and_link(self, card_id: str, card: KnowledgeCard) -> None:
-        """扫描卡片内容，匹配已有卡片标题/别名，建立双向关联。"""
+        """单卡关联检测(手动建卡/改卡): 全库快照一次 + 内存匹配。"""
+        all_cards, total = db_manager.list_cards(limit=100000)
+        if total == 0:
+            return
+        self._link_one(card, all_cards)
+
+    async def _detect_and_link_many(self, card_ids: list[str]) -> None:
+        """批量关联检测: 全库只加载一次, 再逐卡内存匹配。
+
+        替代"每张卡一次全量 collection.get()"的 O(K×N) IO 放大;
+        快照包含本批已入库的全部卡片, 批内互链语义与旧实现一致。
+        """
+        if not card_ids:
+            return
+        all_cards, total = db_manager.list_cards(limit=100000)
+        if total == 0:
+            return
+        by_id = {c.id: c for c in all_cards}
+        for cid in card_ids:
+            card = by_id.get(cid)
+            if card is None:
+                continue
+            try:
+                self._link_one(card, all_cards)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _link_one(self, card: KnowledgeCard, all_cards: list[KnowledgeCard]) -> None:
+        """单卡关联匹配(纯内存)。分类占位卡不参与关联。"""
+        if card.content == PLACEHOLDER_CONTENT:
+            return
+        card_id = card.id
         search_text = (
             card.title + " " + " ".join(card.aliases) + " "
             + card.content + " " + " ".join(card.examples) + " "
             + " ".join(card.questions)
         ).lower()
 
-        all_cards, total = db_manager.list_cards()
-        if total == 0:
-            return
-
         new_links = set(card.related_cards)
         for other in all_cards:
             if other.id == card_id:
+                continue
+            # list_cards 已过滤占位卡; 这里再兜底一次(快照可能来自别处)
+            if other.content == PLACEHOLDER_CONTENT:
                 continue
             match_targets = [other.title.lower()] + [a.lower() for a in other.aliases]
             for target in match_targets:

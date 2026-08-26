@@ -414,19 +414,22 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
             ),
           ),
         Expanded(
-          child: _messages.isEmpty
-              ? ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: const [
-                    Text('与 Agent 对话: 提问、让我导入文件、修改卡片等。'),
-                  ],
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) =>
-                      _buildItem(_messages[index]),
-                ),
+          // RepaintBoundary: 流式输出/滚动只重绘消息区, 不拖累整页
+          child: RepaintBoundary(
+            child: _messages.isEmpty
+                ? ListView(
+                    padding: const EdgeInsets.all(12),
+                    children: const [
+                      Text('与 Agent 对话: 提问、让我导入文件、修改卡片等。'),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) =>
+                        _buildItem(_messages[index]),
+                  ),
+          ),
         ),
         if (_sessionStatus.isNotEmpty)
           Padding(

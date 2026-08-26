@@ -18,6 +18,10 @@ class CategoryRename(BaseModel):
     new_name: str = Field(..., min_length=1, max_length=50)
 
 
+class CategoryDelete(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+
+
 @router.get("", response_model=ApiResponse)
 async def list_categories():
     categories = await card_service.get_categories()
@@ -63,6 +67,9 @@ async def rename_category(data: CategoryRename):
     existing = await card_service.get_categories()
     if old_name not in existing:
         raise HTTPException(status_code=404, detail=f"分类「{old_name}」不存在")
+    # ④ 重命名冲突校验: 目标名已存在(且非自身)时拒绝, 避免静默合并
+    if new_name in existing:
+        raise HTTPException(status_code=400, detail=f"分类「{new_name}」已存在")
     changed = await card_service.rename_category(old_name, new_name)
     return ApiResponse(
         status="success",
@@ -71,10 +78,19 @@ async def rename_category(data: CategoryRename):
     )
 
 
-@router.delete("/{category}", response_model=ApiResponse)
-async def delete_category(category: str):
-    """删除分类 — 该分类下卡片归入「通用」。"""
-    name = category.strip()
+@router.delete("", response_model=ApiResponse)
+async def delete_category(data: CategoryDelete):
+    """删除分类 — 该分类下卡片归入「通用」。
+
+    名称走 JSON body 而非路径参数: 分类名含 `/`、`.` 等字符时
+    路径参数会被路由解码/规范化, 导致 404「接口不存在」。
+    """
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="分类名不能为空")
+    # ⑤ 「通用」为兜底分类, 不可删除
+    if name == "通用":
+        raise HTTPException(status_code=400, detail="「通用」分类不可删除")
     existing = await card_service.get_categories()
     if name not in existing:
         raise HTTPException(status_code=404, detail=f"分类「{name}」不存在")

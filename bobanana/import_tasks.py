@@ -23,6 +23,7 @@ import uuid
 from datetime import UTC, datetime
 
 from bobanana.config import DATA_DIR
+from bobanana.database import PLACEHOLDER_CONTENT
 from bobanana.errors import SW_TASK_404, SW_UPLOAD_400, SWError
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,10 @@ TOKEN_BUCKET_WINDOW_SEC = 10.0
 
 # ── 去重常量 ────────────────────────────────────────────────
 DEDUP_SIMILARITY_THRESHOLD = 0.95
+# 语义去重改为向量检索 top-k(替代全库逐一余弦), 候选数即查询规模上限。
+# 阈值 0.95 意味着只有近似重复才判重, 真实重复在任何度量空间都排在最前,
+# top_k=10 足够覆盖, 不会漏掉。
+DEDUP_QUERY_TOP_K = 10
 
 # ── 持久化目录: tmp/import_tasks/ ───────────────────────────
 IMPORT_TASKS_DIR = DATA_DIR / "tmp" / "import_tasks"
@@ -147,8 +152,11 @@ class DedupIndex:
     def __init__(self, cards: list):
         self.titles: set[str] = set()
         self.aliases: set[str] = set()
-        self.embed_entries: list[dict] = []
         for c in cards:
+            # 分类占位卡(内容为 __CATEGORY_PLACEHOLDER__)不参与去重:
+            # 其标题就是分类名, 会误伤"与分类同名的真实卡"。
+            if getattr(c, "content", "") == PLACEHOLDER_CONTENT:
+                continue
             t = normalize_title(getattr(c, "title", ""))
             if t:
                 self.titles.add(t)
@@ -158,30 +166,26 @@ class DedupIndex:
                     self.aliases.add(na)
 
     def load_embeddings(self) -> None:
-        """从当前 collection 读取既有卡片 embedding(懒加载,失败降级为仅标题/别名去重)。"""
-        try:
-            from bobanana.database import db_manager
+        """(兼容保留) 语义去重改为按需向量检索, 不再预加载全库 embedding。"""
 
-            coll = db_manager.get_collection()
-            if coll is None:
-                return
-            data = coll.get(include=["embeddings", "metadatas", "documents"])
-            if not data or not data.get("ids"):
-                return
-            ids = data.get("ids") or []
-            embs = data.get("embeddings")
-            embs = [] if embs is None else embs
-            metas = data.get("metadatas")
-            metas = [] if metas is None else metas
-            for i, _cid in enumerate(ids):
-                emb = embs[i] if i < len(embs) else None
-                meta = metas[i] if i < len(metas) else {}
-                title = (meta or {}).get("title", "") if meta else ""
-                # emb 可能是 numpy 数组,不能用 bool(emb) 判真(多元素数组会抛异常)。
-                if emb is not None and len(emb) > 0:
-                    self.embed_entries.append({"title": title, "embedding": emb})
+    def _query_similar(self, embedding: list[float]) -> list:
+        """按需向量检索 top-k 候选(仅返回与 embedding 有值的结果)。"""
+        from bobanana.database import db_manager
+
+        try:
+            candidates = db_manager.query_similar_cards(
+                embedding, top_k=DEDUP_QUERY_TOP_K
+            )
         except Exception as e:  # noqa: BLE001
-            logger.warning("去重索引 embedding 加载失败(降级为标题去重): %s", e)
+            logger.warning("去重向量检索失败(降级为标题去重): %s", e)
+            return []
+        out = []
+        for card, emb in candidates:
+            if getattr(card, "content", "") == PLACEHOLDER_CONTENT:
+                continue
+            if emb is not None and len(emb) > 0:
+                out.append((card, emb))
+        return out
 
     def check(self, title: str, aliases: list, embedding_text: str) -> tuple[bool, str]:
         """判断候选卡片是否与既有卡片重复。"""
@@ -193,7 +197,7 @@ class DedupIndex:
             if na and (na in self.titles or na in self.aliases):
                 return True, "别名重复"
 
-        if not self.embed_entries or not embedding_text:
+        if not embedding_text:
             return False, ""
 
         emb: list[float] | None = None
@@ -207,8 +211,8 @@ class DedupIndex:
 
         if not emb:
             return False, ""
-        for entry in self.embed_entries:
-            sim = _cosine(emb, entry["embedding"])
+        for _card, other_emb in self._query_similar(emb):
+            sim = _cosine(emb, other_emb)
             if sim >= DEDUP_SIMILARITY_THRESHOLD:
                 return True, f"与既有卡片语义相似(sim={sim:.3f})"
         return False, ""

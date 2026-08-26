@@ -365,6 +365,29 @@ class DatabaseManager:
                 cards.append((card, 1.0 - dist))
         return cards
 
+    def query_similar_cards(
+        self, query_embedding: list[float], top_k: int = 10,
+    ) -> list[tuple[KnowledgeCard, list[float]]]:
+        """向量检索 top-k, 返回 (卡片, 该卡 embedding)。
+
+        用于导入去重: 只取 top-k 候选, 由调用方自行算余弦,
+        避免全量拉取所有卡片 embedding(库大时 IO/内存随卡片数线性增长)。
+        """
+        with self._lock:
+            result = self._require_collection().query(
+                query_embeddings=[query_embedding],
+                n_results=top_k,
+                include=["documents", "metadatas", "embeddings"],
+            )
+        out = []
+        if result and result.get("ids") and result["ids"]:
+            embs = result.get("embeddings") or []
+            for i in range(len(result["ids"][0])):
+                card = _to_card(result, i, is_query=True)
+                emb = embs[0][i] if embs else None
+                out.append((card, emb))
+        return out
+
     def hybrid_search(
         self,
         query: str,

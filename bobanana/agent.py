@@ -276,7 +276,8 @@ def run_import_workflow_homework(
         return ImportResult(success=[], failed=[{"page": 0, "error": "文件无文本"}], total=0)
 
     emit({"type": "progress", "stage": "hw_search", "status": "started"})
-    existing_cards, total = card_service.list_cards_sync(limit=5000)
+    # 全量加载: limit=5000 时超过 5000 张卡后去重/统计静默失效
+    existing_cards, total = card_service.list_cards_sync(limit=100000)
     emit({"type": "progress", "stage": "hw_search", "status": "ok", "total": total})
 
     if total == 0:
@@ -405,7 +406,7 @@ def run_import_workflow(
         # 去重索引: 与既有卡片比对(标题规范化 + 别名 + embedding 相似度)。
         dedup = DedupIndex([])
         try:
-            existing, _ = card_service.list_cards_sync(limit=5000)
+            existing, _ = card_service.list_cards_sync(limit=100000)
             dedup = DedupIndex(existing)
             dedup.load_embeddings()
         except Exception:

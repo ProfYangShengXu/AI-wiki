@@ -95,8 +95,8 @@ class TestCategoriesAPI:
         assert resp.status_code == 200
         cats = client.get("/api/categories").json()["data"]["categories"]
         assert "临时分类" not in cats and "新分类" in cats
-        # 删除 → 卡片归入通用
-        resp = client.delete("/api/categories/新分类")
+        # 删除(名称走 body) → 卡片归入通用
+        resp = client.request("DELETE", "/api/categories", json={"name": "新分类"})
         assert resp.status_code == 200
         cats = client.get("/api/categories").json()["data"]["categories"]
         assert "新分类" not in cats
@@ -105,6 +105,42 @@ class TestCategoriesAPI:
         assert resp.status_code == 201
         cats = client.get("/api/categories").json()["data"]["categories"]
         assert "新建分类" in cats
+        # 删除已不存在的分类 → 404, detail 透传具体分类名
+        resp = client.request("DELETE", "/api/categories", json={"name": "不存在分类"})
+        assert resp.status_code == 404
+        assert "不存在分类" in resp.json()["message"]
+
+    def test_category_rename_conflict(self):
+        # 重命名到已存在的分类名 → 400, 不静默合并
+        client.post("/api/cards", json={
+            "title": "卡A", "content": "a", "category": "分类A",
+        })
+        client.post("/api/cards", json={
+            "title": "卡B", "content": "b", "category": "分类B",
+        })
+        resp = client.put("/api/categories", json={
+            "old_name": "分类A", "new_name": "分类B",
+        })
+        assert resp.status_code == 400
+        assert "已存在" in resp.json()["message"]
+        # 两个分类都还在, 未被合并
+        cats = client.get("/api/categories").json()["data"]["categories"]
+        assert "分类A" in cats and "分类B" in cats
+
+    def test_category_delete_general_forbidden(self):
+        # 「通用」不可删除
+        resp = client.request("DELETE", "/api/categories", json={"name": "通用"})
+        assert resp.status_code == 400
+        assert "不可删除" in resp.json()["message"]
+
+    def test_category_delete_slash_name(self):
+        # 含斜杠分类名: 走 body 删除正常(路径参数时代会 404 接口不存在)
+        resp = client.post("/api/categories", json={"name": "斜杠/分类"})
+        assert resp.status_code == 201
+        resp = client.request("DELETE", "/api/categories", json={"name": "斜杠/分类"})
+        assert resp.status_code == 200
+        cats = client.get("/api/categories").json()["data"]["categories"]
+        assert "斜杠/分类" not in cats
 
 
 class TestUploadAPI:

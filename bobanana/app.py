@@ -172,10 +172,17 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
+    # 业务路由抛出的 HTTPException(404, detail="分类「X」不存在") 带具体 detail,
+    # 透传真实原因; 纯"无此路由"时保留通用文案。
+    detail = getattr(exc, "detail", None)
+    if isinstance(detail, str) and detail.strip() and detail.strip() != "Not Found":
+        message = detail.strip()
+    else:
+        message = "接口不存在"
     return JSONResponse(
         status_code=404,
         content=ApiResponse(
-            status="error", message="接口不存在", error_code="NOT_FOUND"
+            status="error", message=message, error_code="NOT_FOUND"
         ).model_dump(),
     )
 

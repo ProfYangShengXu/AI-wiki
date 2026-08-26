@@ -197,8 +197,11 @@ class ApiClient {
   }
 
   /// 删除分类(该分类下卡片归入「通用」)。
+  ///
+  /// 名称走 JSON body: 分类名含 `/`、`.` 等字符时路径参数会被
+  /// 路由解码/规范化, 导致 404「接口不存在」。
   Future<void> deleteCategory(String name) async {
-    await _dataOf(_dio.delete<dynamic>('/api/categories/${Uri.encodeComponent(name)}'));
+    await _dataOf(_dio.delete<dynamic>('/api/categories', data: {'name': name}));
   }
 
   Future<List<KnowledgeCard>> listCards({

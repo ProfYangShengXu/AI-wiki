@@ -212,6 +212,11 @@ class _WikiPageState extends ConsumerState<WikiPage> {
       if (confirmed != true || !mounted) return;
       try {
         await api.deleteCategory(name);
+        // ③ 删除后重置选中态: 避免下拉残留已删分类, 再次操作报"不存在"
+        setState(() {
+          if (_category == name) _category = null;
+          _selected = null;
+        });
         ref.read(dataRefreshProvider.notifier).state++;
         _load();
       } catch (e) {
