@@ -24,6 +24,52 @@ LOGS_DIR = DATA_DIR / "logs"
 # ── 加载 .env 文件（如果存在）────────────────────────────────
 load_dotenv(dotenv_path=ENV_FILE)
 
+
+def reload_env() -> None:
+    """重载 .env 到进程环境(override=True), 供设置变更后即时生效。
+
+    调用后需同时 reset_llm_cache() 让 LLM 实例按新配置重建。
+    """
+    load_dotenv(dotenv_path=ENV_FILE, override=True)
+    # 同步更新本模块的配置常量(供后续 from bobanana.config import X 读到新值)
+    _sync_globals_from_env()
+
+
+def _sync_globals_from_env() -> None:
+    """把 .env/进程环境的最新值写回模块级变量。"""
+    import os as _os
+    # LLM 相关
+    for name in (
+        "LLM_PROVIDER", "LLM_PROVIDERS",
+        "OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_BASE_URL",
+        "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "DEEPSEEK_BASE_URL",
+        "OLLAMA_BASE_URL", "OLLAMA_MODEL",
+        "KIMI_API_KEY", "KIMI_MODEL", "KIMI_BASE_URL",
+        "GLM_API_KEY", "GLM_MODEL", "GLM_BASE_URL",
+        "GROK_API_KEY", "GROK_MODEL", "GROK_BASE_URL",
+        "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_BASE_URL",
+        "GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_BASE_URL",
+        "LLM_TEMPERATURE", "LLM_MAX_TOKENS", "LLM_TIMEOUT_SEC",
+    ):
+        val = _os.getenv(name)
+        if val is not None:
+            globals()[name] = _coerce(name, val)
+
+
+def _coerce(name: str, val: str):
+    """按配置项预期类型转换 env 字符串。"""
+    if name in ("LLM_TEMPERATURE",):
+        try:
+            return float(val)
+        except ValueError:
+            return val
+    if name in ("LLM_MAX_TOKENS", "LLM_TIMEOUT_SEC"):
+        try:
+            return int(val)
+        except ValueError:
+            return val
+    return val
+
 # ── LLM 配置 ─────────────────────────────────────────────────
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai | ollama | deepseek | kimi | glm | grok | anthropic | gemini
 # 降级链: 逗号分隔, 按顺序尝试 (Phase 2)

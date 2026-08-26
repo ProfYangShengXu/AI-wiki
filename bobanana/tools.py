@@ -829,6 +829,7 @@ def _invoke_one(llm, messages, timeout_sec: int) -> str:
     if chat_model:
         def _call():
             response = llm.invoke(messages)
+            _record_token_usage(response)
             return response.content
     else:
         prompt = "\n".join(
@@ -836,6 +837,7 @@ def _invoke_one(llm, messages, timeout_sec: int) -> str:
         )
         def _call():
             response = llm.invoke(prompt)
+            _record_token_usage(response)
             return response if isinstance(response, str) else str(response)
 
     pool = _get_llm_executor()
@@ -844,6 +846,50 @@ def _invoke_one(llm, messages, timeout_sec: int) -> str:
         return future.result(timeout=timeout_sec)
     except concurrent.futures.TimeoutError:
         raise TimeoutError(f"LLM 调用超时 ({timeout_sec}s)") from None
+
+
+# ── Token 用量统计 ─────────────────────────────────────────
+_token_lock = threading.Lock()
+_token_total = {"prompt": 0, "completion": 0}
+
+
+def _record_token_usage(response) -> None:
+    """从 LLM 响应中提取 token 用量并累计(幂等, 失败静默)。"""
+    try:
+        usage = None
+        meta = getattr(response, "response_metadata", None)
+        if isinstance(meta, dict):
+            usage = meta.get("token_usage") or meta.get("usage")
+        if usage is None:
+            raw = getattr(response, "raw", None)
+            if isinstance(raw, dict):
+                usage = raw.get("usage")
+        if not isinstance(usage, dict):
+            return
+        prompt = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+        completion = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+        with _token_lock:
+            _token_total["prompt"] += prompt
+            _token_total["completion"] += completion
+    except Exception:  # noqa: BLE001 — 统计失败不影响调用
+        pass
+
+
+def get_token_usage() -> dict:
+    """返回累计 token 用量 {prompt, completion, total}。"""
+    with _token_lock:
+        return {
+            "prompt": _token_total["prompt"],
+            "completion": _token_total["completion"],
+            "total": _token_total["prompt"] + _token_total["completion"],
+        }
+
+
+def reset_token_usage() -> None:
+    """清零 token 统计(会话切换时调用)。"""
+    with _token_lock:
+        _token_total["prompt"] = 0
+        _token_total["completion"] = 0
 
 
 def _record_llm_metric(succeeded: bool, start_time: float) -> None:
@@ -924,6 +970,9 @@ def llm_stream(system_prompt: str, user_prompt: str):
             raise RuntimeError("当前 provider 不支持流式, 降级")
         for chunk in llm.stream(messages):
             content = getattr(chunk, "content", "")
+            # 流式最后一块常带 usage 元数据
+            if getattr(chunk, "response_metadata", None):
+                _record_token_usage(chunk)
             if isinstance(content, str) and content:
                 yield content
             elif isinstance(content, list):

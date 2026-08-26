@@ -32,8 +32,8 @@ def test_normalize_exact_and_unknown():
     assert normalize_category(None) == "通用"
 
 
-def test_create_card_normalizes_category(tmp_path, monkeypatch, isolated_chroma):
-    """入库前分类归一化到固定表。"""
+def test_create_card_keeps_manual_category(tmp_path, monkeypatch, isolated_chroma):
+    """手动创建卡片保留用户指定分类(支持分类手动 CRUD)。"""
     patch_embeddings(monkeypatch)
     from bobanana.database import db_manager
     from bobanana.models import CardCreate
@@ -41,13 +41,13 @@ def test_create_card_normalizes_category(tmp_path, monkeypatch, isolated_chroma)
 
     async def go():
         card = await card_service.create_card(
-            CardCreate(title="测试", content="内容", category="Agent框架")
+            CardCreate(title="测试", content="内容", category="自定义分类")
         )
         return card.category, db_manager.get_categories()
 
     category, cats = asyncio.run(go())
-    assert category == "Agent 与多智能体"
-    assert cats == ["Agent 与多智能体"]
+    assert category == "自定义分类"
+    assert cats == ["自定义分类"]
 
 
 def test_migrate_categories_normalizes_stored(tmp_path, monkeypatch, isolated_chroma):

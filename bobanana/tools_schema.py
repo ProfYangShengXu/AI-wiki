@@ -4,6 +4,7 @@ import json as _json
 import logging
 import re
 import typing
+from pathlib import Path
 
 from pydantic import Field, create_model
 
@@ -12,6 +13,53 @@ from bobanana.service.card_service import card_service
 from bobanana.tools import llm_invoke, web_search
 
 logger = logging.getLogger(__name__)
+
+
+def _uploads_dir() -> Path:
+    from bobanana.config import UPLOAD_DIR
+    return UPLOAD_DIR
+
+
+def _list_uploads() -> list[str]:
+    """列出 uploads 目录中的文件名(供 agent 定位已上传文档)。"""
+    try:
+        d = _uploads_dir()
+        if not d.exists():
+            return []
+        return sorted(p.name for p in d.iterdir() if p.is_file())
+    except Exception:
+        return []
+
+
+def _resolve_uploaded_file(hint: str):
+    """在 uploads 目录按文件名/关键词模糊匹配已上传文件。
+
+    返回匹配的 Path 或 None。hint 可能是完整文件名、storage_name 或文件名片段。
+    """
+    from pathlib import Path
+    hint = (hint or "").strip().lower()
+    if not hint:
+        return None
+    d = _uploads_dir()
+    if not d.exists():
+        return None
+    try:
+        files = [p for p in d.iterdir() if p.is_file()]
+    except Exception:
+        return None
+    # 1) 精确匹配
+    for p in files:
+        if p.name.lower() == hint:
+            return p
+    # 2) 文件名包含 hint
+    for p in files:
+        if hint in p.name.lower():
+            return p
+    # 3) hint 包含文件名
+    for p in files:
+        if p.name.lower() in hint:
+            return p
+    return None
 
 # ═══════════════════════════════════════════════════════════
 # 工具 Schema 定义 (Function Calling 格式)
@@ -89,11 +137,11 @@ TOOLS: list[dict] = [
     },
     {
         "name": "upload_document",
-        "description": "上传文档(PDF/Word/MD)导入知识库。接受文件路径。",
+        "description": "导入文档(PDF/Word/MD/TXT)到知识库。传入文件名即可(会自动在 uploads 目录匹配已上传文件), 不要编造完整路径。",
         "parameters": {
             "type": "object",
             "properties": {
-                "file_path": {"type": "string", "description": "文档路径（由用户指定或前端上传后传入）"}
+                "file_path": {"type": "string", "description": "文档文件名或路径(前端上传后的文件名)"}
             },
             "required": ["file_path"]
         }
@@ -196,9 +244,16 @@ def execute_tool(tool_name: str, params: dict) -> dict:
             file_path = str(params.get("file_path") or "")
             p = Path(file_path)
             if not p.is_file():
-                return {"error": f"文件不存在: {file_path}"}
+                # 容错: 在 uploads 目录按文件名/关键词模糊搜索
+                resolved = _resolve_uploaded_file(file_path)
+                if resolved is None:
+                    return {
+                        "error": f"文件不存在: {file_path}。请先在前端上传文档, 或提供 uploads 目录中的文件名",
+                        "uploads": _list_uploads(),
+                    }
+                p = resolved
             from bobanana.agent import run_import_workflow
-            result = run_import_workflow(file_path, p.name)
+            result = run_import_workflow(str(p), p.name)
             return {
                 "status": "imported",
                 "file": p.name,

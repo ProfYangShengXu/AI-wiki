@@ -73,23 +73,38 @@ class TestCardsAPI:
 
 class TestCategoriesAPI:
     def test_categories(self):
-        # 分类收敛: 任意分类入库前归一化到固定分类表
-        from bobanana.agent import CANONICAL_CATEGORIES
+        # 手动创建卡片保留自定义分类(支持分类手动 CRUD)
         client.post("/api/cards", json={
             "title": "测试分类", "content": "test", "category": "测试分类A",
         })
         resp = client.get("/api/categories")
         assert resp.status_code == 200
         cats = resp.json()["data"]["categories"]
-        # 非规范分类被归入"通用"
-        assert "测试分类A" not in cats
-        assert "通用" in cats
-        # 规范分类直接可用
+        # 自定义分类被保留
+        assert "测试分类A" in cats
+
+    def test_category_rename_delete(self):
+        # 分类重命名/删除/新建
         client.post("/api/cards", json={
-            "title": "测试分类2", "content": "test2", "category": CANONICAL_CATEGORIES[0],
+            "title": "卡1", "content": "c1", "category": "临时分类",
         })
-        resp = client.get("/api/categories")
-        assert CANONICAL_CATEGORIES[0] in resp.json()["data"]["categories"]
+        # 重命名
+        resp = client.put("/api/categories", json={
+            "old_name": "临时分类", "new_name": "新分类",
+        })
+        assert resp.status_code == 200
+        cats = client.get("/api/categories").json()["data"]["categories"]
+        assert "临时分类" not in cats and "新分类" in cats
+        # 删除 → 卡片归入通用
+        resp = client.delete("/api/categories/新分类")
+        assert resp.status_code == 200
+        cats = client.get("/api/categories").json()["data"]["categories"]
+        assert "新分类" not in cats
+        # 新建
+        resp = client.post("/api/categories", json={"name": "新建分类"})
+        assert resp.status_code == 201
+        cats = client.get("/api/categories").json()["data"]["categories"]
+        assert "新建分类" in cats
 
 
 class TestUploadAPI:

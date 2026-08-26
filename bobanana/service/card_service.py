@@ -55,13 +55,25 @@ class CardService:
     async def get_categories(self) -> list[str]:
         return db_manager.get_categories()
 
+    async def rename_category(self, old_name: str, new_name: str) -> int:
+        """重命名分类(同步写库)。"""
+        return db_manager.rename_category(old_name, new_name)
+
+    async def delete_category(self, category: str, fallback: str = "通用") -> int:
+        """删除分类 — 卡片归入 fallback。"""
+        return db_manager.delete_category(category, fallback)
+
     async def count(self) -> int:
         return db_manager.count()
 
     # ── 写操作（threading.Lock 序列化） ───────────────────
 
     async def create_card(self, data: CardCreate) -> KnowledgeCard:
-        """创建卡片 — embedding 在锁外计算。"""
+        """创建卡片 — embedding 在锁外计算。
+
+        注意: 分类收敛(normalize_category)只在 LLM 提取流程(agent.py)应用,
+        手动创建的卡片保留用户指定分类, 以支持分类手动 CRUD。
+        """
         now = datetime.now(UTC).isoformat()
         card = KnowledgeCard(
             id=str(uuid.uuid4()),
@@ -77,9 +89,6 @@ class CardService:
             created_at=now,
             updated_at=now,
         )
-        # 分类收敛: 入库前归一化到固定分类表
-        from bobanana.agent import normalize_category
-        card.category = normalize_category(card.category)
         # 锁外计算 embedding
         embedding = self._compute_embedding(card.embedding_text())
 
@@ -99,9 +108,6 @@ class CardService:
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(existing, field, value)
-        if "category" in update_data:
-            from bobanana.agent import normalize_category
-            existing.category = normalize_category(existing.category)
         existing.updated_at = datetime.now(UTC).isoformat()
 
         # 锁外计算 embedding
@@ -226,9 +232,6 @@ class CardService:
         if not card: return None
         for f, v in data.model_dump(exclude_unset=True).items():
             setattr(card, f, v)
-        if hasattr(data, "category") and data.model_dump(exclude_unset=True).get("category") is not None:
-            from bobanana.agent import normalize_category
-            card.category = normalize_category(card.category)
         embedding = self._compute_embedding(card.embedding_text())
         db_manager.update_card(card_id, card, embedding)
         return card

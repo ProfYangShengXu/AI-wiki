@@ -162,6 +162,18 @@ class ApiClient {
     return BootstrapActionResult.fromJson(data);
   }
 
+  /// 批量保存设置(写 .env 并即时生效, 无需重启)。
+  Future<void> saveSettings(Map<String, String> updates) async {
+    await _dataOf(_dio.post<dynamic>('/api/settings/batch', data: [
+      for (final e in updates.entries) {'key': e.key, 'value': e.value},
+    ]));
+  }
+
+  /// 获取指标(含 LLM token 用量)。
+  Future<Map<String, dynamic>> getMetrics() async {
+    return _dataOf(_dio.get<dynamic>('/api/metrics'));
+  }
+
   Future<List<String>> listCategories() async {
     final data = await _dataOf(_dio.get<dynamic>('/api/categories'));
     final raw = data['categories'];
@@ -169,6 +181,24 @@ class ApiClient {
       return raw.map((e) => e.toString()).toList();
     }
     return const [];
+  }
+
+  /// 新建分类。
+  Future<void> createCategory(String name) async {
+    await _dataOf(_dio.post<dynamic>('/api/categories', data: {'name': name}));
+  }
+
+  /// 重命名分类(同步改该分类下所有卡片)。
+  Future<void> renameCategory(String oldName, String newName) async {
+    await _dataOf(_dio.put<dynamic>(
+      '/api/categories',
+      data: {'old_name': oldName, 'new_name': newName},
+    ));
+  }
+
+  /// 删除分类(该分类下卡片归入「通用」)。
+  Future<void> deleteCategory(String name) async {
+    await _dataOf(_dio.delete<dynamic>('/api/categories/${Uri.encodeComponent(name)}'));
   }
 
   Future<List<KnowledgeCard>> listCards({

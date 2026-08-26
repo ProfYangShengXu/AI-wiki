@@ -113,5 +113,14 @@ async def save_settings(updates: list[SettingsUpdate]):
         for k, v in env.items():
             f.write(f"{k}={v}\n")
 
+    # 即时生效: 重载 .env 到进程环境, 并清空 LLM 实例缓存
+    try:
+        from bobanana.config import reload_env
+        from bobanana.tools import reset_llm_cache
+        reload_env()
+        reset_llm_cache()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("设置即时生效失败(需重启): %s", e)
+
     logger.info("批量设置已更新: %d 项", len(updates))
-    return {"status": "success", "message": f"{len(updates)} 项设置已更新"}
+    return {"status": "success", "message": f"{len(updates)} 项设置已更新(即时生效)"}

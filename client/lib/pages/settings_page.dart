@@ -8,13 +8,37 @@ import '../state/bootstrap_controller.dart';
 import 'offline_pack_page.dart';
 import 'pairing_page.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  Map<String, dynamic>? _metrics;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMetrics();
+  }
+
+  Future<void> _loadMetrics() async {
+    try {
+      final m = await ref.read(apiClientProvider).getMetrics();
+      if (mounted) setState(() => _metrics = m);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final api = ref.watch(apiClientProvider);
     final bootstrap = ref.watch(bootstrapControllerProvider);
+    final tokenUsage = (_metrics?['token_usage'] as Map?) ?? const {};
+    final promptTokens = tokenUsage['prompt'] ?? 0;
+    final completionTokens = tokenUsage['completion'] ?? 0;
+    final totalTokens = tokenUsage['total'] ?? 0;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -35,6 +59,26 @@ class SettingsPage extends ConsumerWidget {
           leading: const Icon(Icons.hub_outlined),
           title: const Text('供应商'),
           subtitle: Text(bootstrap.provider),
+        ),
+        // Token 消耗统计
+        ListTile(
+          leading: const Icon(Icons.data_usage_outlined),
+          title: const Text('Token 消耗'),
+          subtitle: Text(
+            '输入 ${_fmtToken(promptTokens)} · 输出 ${_fmtToken(completionTokens)} · 总计 ${_fmtToken(totalTokens)}',
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: '刷新',
+            onPressed: _loadMetrics,
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.tune_outlined),
+          title: const Text('切换 API 设置'),
+          subtitle: const Text('更换供应商/Key/模型, 即时生效无需重启'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _showApiSettings,
         ),
         if (SidecarService.instance.isWindows) ..._sidecarTiles(context),
         const Divider(),
@@ -93,6 +137,179 @@ class SettingsPage extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  String _fmtToken(dynamic v) {
+    final n = v is int ? v : (v is num ? v.toInt() : 0);
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}k';
+    return '$n';
+  }
+
+  /// 切换 API 设置对话框: 选供应商/Key/BaseURL/模型, 保存后即时生效。
+  Future<void> _showApiSettings() async {
+    final bootstrap = ref.read(bootstrapControllerProvider);
+    final baseUrlCtrl = TextEditingController(text: '');
+    final modelCtrl = TextEditingController(text: '');
+    final keyCtrl = TextEditingController(text: '');
+
+    const providers = [
+      ('deepseek', 'DeepSeek'),
+      ('openai', 'OpenAI'),
+      ('kimi', 'Kimi (月之暗面)'),
+      ('glm', 'GLM (智谱)'),
+      ('grok', 'Grok (xAI)'),
+      ('anthropic', 'Claude (Anthropic)'),
+      ('gemini', 'Gemini (Google)'),
+    ];
+    // provider → (model, baseUrl) 默认值
+    const defaults = {
+      'deepseek': ('deepseek-v4-flash', 'https://api.deepseek.com'),
+      'openai': ('gpt-4o-mini', 'https://api.openai.com/v1'),
+      'kimi': ('moonshot-v1-8k', 'https://api.moonshot.cn/v1'),
+      'glm': ('glm-4-flash', 'https://open.bigmodel.cn/api/paas/v4'),
+      'grok': ('grok-3-mini', 'https://api.x.ai/v1'),
+      'anthropic': ('claude-sonnet-4-5', 'https://api.anthropic.com'),
+      'gemini': ('gemini-2.0-flash', ''),
+    };
+
+    var provider = bootstrap.provider;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('切换 API 设置'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButton<String>(
+                    value: provider,
+                    isExpanded: true,
+                    items: [
+                      for (final (id, label) in providers)
+                        DropdownMenuItem(value: id, child: Text(label)),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setDialogState(() {
+                        provider = v;
+                        final d = defaults[v] ?? defaults['deepseek']!;
+                        modelCtrl.text = d.$1;
+                        baseUrlCtrl.text = d.$2;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: keyCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'API Key',
+                      hintText: 'sk-...',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: baseUrlCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Base URL(可留空)',
+                      hintText: 'https://api.xxx.com/v1',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: modelCtrl,
+                    decoration: const InputDecoration(labelText: '模型'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (keyCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('请填写 API Key')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('保存并切换'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      final updates = <String, String>{
+        'LLM_PROVIDER': provider,
+        if (baseUrlCtrl.text.trim().isNotEmpty)
+          _providerBaseUrlEnv(provider): baseUrlCtrl.text.trim(),
+        if (modelCtrl.text.trim().isNotEmpty)
+          _providerModelEnv(provider): modelCtrl.text.trim(),
+        _providerKeyEnv(provider): keyCtrl.text.trim(),
+      };
+      await ref.read(apiClientProvider).saveSettings(updates);
+      await ref.read(bootstrapControllerProvider.notifier).load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✓ 已切换, 即时生效')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('切换失败: $e')),
+        );
+      }
+    }
+  }
+
+  String _providerKeyEnv(String provider) {
+    switch (provider) {
+      case 'openai': return 'OPENAI_API_KEY';
+      case 'kimi': return 'KIMI_API_KEY';
+      case 'glm': return 'GLM_API_KEY';
+      case 'grok': return 'GROK_API_KEY';
+      case 'anthropic': return 'ANTHROPIC_API_KEY';
+      case 'gemini': return 'GEMINI_API_KEY';
+      default: return 'DEEPSEEK_API_KEY';
+    }
+  }
+
+  String _providerModelEnv(String provider) {
+    switch (provider) {
+      case 'openai': return 'OPENAI_MODEL';
+      case 'kimi': return 'KIMI_MODEL';
+      case 'glm': return 'GLM_MODEL';
+      case 'grok': return 'GROK_MODEL';
+      case 'anthropic': return 'ANTHROPIC_MODEL';
+      case 'gemini': return 'GEMINI_MODEL';
+      default: return 'DEEPSEEK_MODEL';
+    }
+  }
+
+  String _providerBaseUrlEnv(String provider) {
+    switch (provider) {
+      case 'openai': return 'OPENAI_BASE_URL';
+      case 'kimi': return 'KIMI_BASE_URL';
+      case 'glm': return 'GLM_BASE_URL';
+      case 'grok': return 'GROK_BASE_URL';
+      case 'anthropic': return 'ANTHROPIC_BASE_URL';
+      default: return 'DEEPSEEK_BASE_URL';
+    }
   }
 
   /// Windows 本地服务(sidecar)管理项。

@@ -139,6 +139,116 @@ class _WikiPageState extends ConsumerState<WikiPage> {
     }
   }
 
+  /// 分类管理: 新建 / 重命名 / 删除。
+  Future<void> _manageCategories() async {
+    final api = ref.read(apiClientProvider);
+    // 底部弹出菜单选择操作
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: const Text('新建分类'),
+              onTap: () => Navigator.pop(ctx, 'create'),
+            ),
+            if (_category != null)
+              ListTile(
+                leading: const Icon(Icons.drive_file_rename_outline),
+                title: Text('重命名「$_category」'),
+                onTap: () => Navigator.pop(ctx, 'rename'),
+              ),
+            if (_category != null && _category != '通用')
+              ListTile(
+                leading: Icon(Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error),
+                title: Text('删除「$_category」'),
+                onTap: () => Navigator.pop(ctx, 'delete'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+
+    if (action == 'create') {
+      final name = await _promptText('新建分类', '分类名称');
+      if (name == null || name.isEmpty || !mounted) return;
+      try {
+        await api.createCategory(name);
+        ref.read(dataRefreshProvider.notifier).state++;
+        _load();
+      } catch (e) {
+        _snack('新建分类失败: $e');
+      }
+    } else if (action == 'rename') {
+      final oldName = _category!;
+      final newName = await _promptText('重命名分类', '新名称', initial: oldName);
+      if (newName == null || newName.isEmpty || !mounted) return;
+      try {
+        await api.renameCategory(oldName, newName);
+        ref.read(dataRefreshProvider.notifier).state++;
+        _load();
+      } catch (e) {
+        _snack('重命名失败: $e');
+      }
+    } else if (action == 'delete') {
+      final name = _category!;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('删除分类'),
+          content: Text('删除「$name」?该分类下所有卡片将归入「通用」。'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      try {
+        await api.deleteCategory(name);
+        ref.read(dataRefreshProvider.notifier).state++;
+        _load();
+      } catch (e) {
+        _snack('删除分类失败: $e');
+      }
+    }
+  }
+
+  Future<String?> _promptText(String title, String label,
+      {String? initial}) async {
+    final ctrl = TextEditingController(text: initial ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(labelText: label),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    return result;
+  }
+
+  void _snack(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
   Future<void> _deleteCard(KnowledgeCard card) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -371,6 +481,11 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                 tooltip: '新建卡片',
                 onPressed: _createCard,
                 icon: const Icon(Icons.add),
+              ),
+              IconButton(
+                tooltip: '管理分类',
+                onPressed: _manageCategories,
+                icon: const Icon(Icons.folder_outlined),
               ),
             ],
           ),

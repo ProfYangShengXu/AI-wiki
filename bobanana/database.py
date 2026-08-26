@@ -432,6 +432,44 @@ class DatabaseManager:
                 cats.add(m["category"])
         return sorted(cats)
 
+    def rename_category(self, old_name: str, new_name: str) -> int:
+        """重命名分类: 把所有 old_name 卡片的 category 改为 new_name。返回改动数。"""
+        collection = self._require_collection()
+        with self._lock:
+            result = collection.get()
+        if not result or not result.get("ids"):
+            return 0
+        ids = result["ids"]
+        metas = result.get("metadatas") or []
+        changed = 0
+        for i, cid in enumerate(ids):
+            m = metas[i] if i < len(metas) and metas[i] else None
+            if m and m.get("category") == old_name:
+                m["category"] = new_name
+                with self._lock:
+                    collection.update(ids=[cid], metadatas=[m])
+                changed += 1
+        return changed
+
+    def delete_category(self, category: str, fallback: str = "通用") -> int:
+        """删除分类: 把该分类下所有卡片的 category 改为 fallback。返回改动数。"""
+        collection = self._require_collection()
+        with self._lock:
+            result = collection.get()
+        if not result or not result.get("ids"):
+            return 0
+        ids = result["ids"]
+        metas = result.get("metadatas") or []
+        changed = 0
+        for i, cid in enumerate(ids):
+            m = metas[i] if i < len(metas) and metas[i] else None
+            if m and m.get("category") == category:
+                m["category"] = fallback
+                with self._lock:
+                    collection.update(ids=[cid], metadatas=[m])
+                changed += 1
+        return changed
+
     def count(self) -> int:
         collection = self._require_collection()
         with self._lock:
