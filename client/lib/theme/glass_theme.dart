@@ -113,15 +113,18 @@ class GlassTheme {
 
   /// 页面背景 (配合 Scaffold 使用)。
   ///
-  /// 纯渐变, 无 Stack/光斑 — 避免任何可能影响命中测试的覆盖层,
-  /// 保证所有按钮/下拉可正常交互。
+  /// 渐变底 + 预渲染辉光: 光斑用 CustomPainter 画进画布(只画一次),
+  /// 不参与命中测试(无 Stack/Positioned 覆盖层), 按钮交互不受影响。
   static Widget background(BuildContext context, {required Widget child}) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: dark ? darkBackgroundGradient : backgroundGradient,
       ),
-      child: child,
+      child: CustomPaint(
+        painter: _GlowPainter(dark: dark),
+        child: child,
+      ),
     );
   }
 
@@ -327,4 +330,36 @@ class GlassPageTransition extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// 辉光绘制器 — 把径向光斑"预渲染"到画布, 无命中测试影响。
+class _GlowPainter extends CustomPainter {
+  _GlowPainter({required this.dark});
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    void orb(double cx, double cy, double r, Color color) {
+      final paint = Paint()
+        ..shader = RadialGradient(
+          colors: [color, color.withValues(alpha: 0)],
+        ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r));
+      canvas.drawCircle(Offset(cx, cy), r, paint);
+    }
+
+    // 4 个角落辉光 (alpha 8-12%, 极淡氛围感)
+    orb(w * 0.15, h * 0.10, w * 0.55,
+        dark ? const Color(0x143B82F6) : const Color(0x1F3B82F6));
+    orb(w * 0.85, h * 0.85, w * 0.50,
+        dark ? const Color(0x148B5CF6) : const Color(0x1F8B5CF6));
+    orb(w * 0.70, h * 0.20, w * 0.35,
+        dark ? const Color(0x10EC4899) : const Color(0x1AEC4899));
+    orb(w * 0.10, h * 0.75, w * 0.30,
+        dark ? const Color(0x0D38BDF8) : const Color(0x1438BDF8));
+  }
+
+  @override
+  bool shouldRepaint(_GlowPainter oldDelegate) => oldDelegate.dark != dark;
 }
