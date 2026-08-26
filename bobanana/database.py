@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 _RETRY_INTERVAL_SEC = 300   # 5 分钟
 _RETRY_MAX_ATTEMPTS = 3
 
+# ── 分类占位卡片标记(新建空分类时创建的隐藏卡片) ────────
+PLACEHOLDER_CONTENT = "__CATEGORY_PLACEHOLDER__"
+
 
 class DatabaseManager:
     def __init__(self):
@@ -340,6 +343,9 @@ class DatabaseManager:
         else:
             cards = [_to_card(result, i) for i in range(total)]
 
+        # 过滤分类占位卡片, 不对外展示
+        cards = [c for c in cards if c.content != PLACEHOLDER_CONTENT]
+        total = len(cards)
         start, end = (page-1)*limit, min(page*limit, total)
         return cards[start:end], total
 
@@ -353,6 +359,8 @@ class DatabaseManager:
         if result and result.get("ids") and result["ids"]:
             for i in range(len(result["ids"][0])):
                 card = _to_card(result, i, is_query=True)
+                if card.content == PLACEHOLDER_CONTENT:
+                    continue
                 dist = result["distances"][0][i] if result.get("distances") else 0.0
                 cards.append((card, 1.0 - dist))
         return cards
@@ -419,7 +427,10 @@ class DatabaseManager:
             pos = idx_map.get(card_id)
             if pos is None:
                 continue
-            cards.append((_to_card(result, pos), score))
+            card = _to_card(result, pos)
+            if card.content == PLACEHOLDER_CONTENT:
+                continue
+            cards.append((card, score))
         return cards
 
     def get_categories(self) -> list[str]:
@@ -460,10 +471,18 @@ class DatabaseManager:
             return 0
         ids = result["ids"]
         metas = result.get("metadatas") or []
+        docs = result.get("documents") or []
         changed = 0
         for i, cid in enumerate(ids):
             m = metas[i] if i < len(metas) and metas[i] else None
             if m and m.get("category") == category:
+                doc = docs[i] if i < len(docs) else ""
+                if doc == PLACEHOLDER_CONTENT:
+                    # 空分类的占位卡片随分类一起删除
+                    with self._lock:
+                        collection.delete(ids=[cid])
+                    changed += 1
+                    continue
                 m["category"] = fallback
                 with self._lock:
                     collection.update(ids=[cid], metadatas=[m])

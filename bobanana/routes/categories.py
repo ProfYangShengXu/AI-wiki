@@ -36,10 +36,18 @@ async def create_category(data: CategoryCreate):
     existing = await card_service.get_categories()
     if name in existing:
         raise HTTPException(status_code=400, detail=f"分类「{name}」已存在")
+    from bobanana.models import CardCreate
+    card = await card_service.create_card(
+        CardCreate(
+            title=name,
+            content="__CATEGORY_PLACEHOLDER__",
+            category=name,
+        )
+    )
     return ApiResponse(
         status="success",
         message=f"分类「{name}」已创建",
-        data={"category": name},
+        data={"category": name, "card_id": card.id},
     )
 
 

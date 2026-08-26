@@ -5,6 +5,7 @@ import '../core/api_client.dart';
 import '../models/knowledge_card.dart';
 import '../state/refresh.dart';
 import '../theme/glass_theme.dart';
+import '../widgets/category_dropdown.dart';
 import '../widgets/chat_panel.dart';
 import '../widgets/markdown_text.dart';
 
@@ -314,20 +315,16 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                     ),
                     const SizedBox(height: 8),
                     // 受控下拉: setDialogState 更新 category 后 value 同步
-                    DropdownButton<String>(
+                    CategoryDropdown(
                       value: category,
-                      isExpanded: true,
-                      underline: const SizedBox.shrink(),
-                      hint: const Text('分类'),
-                      items: [
-                        if (!_categories.contains('通用'))
-                          const DropdownMenuItem(value: '通用', child: Text('通用')),
-                        for (final c in _categories)
-                          DropdownMenuItem(value: c, child: Text(c)),
-                      ],
                       onChanged: (v) => setDialogState(() {
                         category = v ?? '通用';
                       }),
+                      categories: [
+                        ..._categories,
+                        if (!_categories.contains('通用')) '通用',
+                      ],
+                      includeAll: false,
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -452,22 +449,9 @@ class _WikiPageState extends ConsumerState<WikiPage> {
           child: Row(
             children: [
               Expanded(
-                // 完全受控下拉: value 每次 build 同步 _category,
-                // 避免 DropdownButtonFormField.initialValue 不随状态更新的问题
-                child: DropdownButton<String?>(
+                // 圆角深灰底浅灰字 + 滚动条; key 同步外部状态
+                child: CategoryDropdown(
                   value: _category,
-                  isExpanded: true,
-                  underline: const SizedBox.shrink(),
-                  hint: const Text('分类'),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('全部分类'),
-                    ),
-                    ..._categories.map(
-                      (c) => DropdownMenuItem<String?>(value: c, child: Text(c)),
-                    ),
-                  ],
                   onChanged: (value) {
                     setState(() {
                       _category = value;
@@ -475,6 +459,8 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                     });
                     _load();
                   },
+                  categories: _categories,
+                  includeAll: true,
                 ),
               ),
               IconButton(
