@@ -111,7 +111,7 @@ class WSMessage(BaseModel):
         pattern=(
             "^(message|response|progress|card_preview|card_update|error|"
             "llm.delta|tool.called|tool.result|approval_required|approval|"
-            "session.started|session.done|session.error)$"
+            "session.started|session.done|session.error|import.done)$"
         ),
     )
     content: str = ""

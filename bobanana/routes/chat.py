@@ -115,6 +115,40 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# 导入完成 → 广播给所有活跃 WS 连接 (import_tasks 后台线程调用,
+# 需调度回主事件循环)。_broadcast_loop 在连接建立时保存。
+_broadcast_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _on_import_finished(state: dict) -> None:
+    """导入任务到达终态时, 推送 import.done 事件给前端。"""
+    loop = _broadcast_loop
+    if loop is None or not loop.is_running():
+        return
+    try:
+        msg = WSMessage(
+            type="import.done",
+            content=state.get("message", ""),
+            data={
+                "task_id": state.get("task_id", ""),
+                "status": state.get("status", ""),
+                "imported": state.get("result", {}).get("imported", 0),
+                "skipped": state.get("result", {}).get("skipped", 0),
+                "failed": state.get("result", {}).get("failed", 0),
+                "errors": state.get("result", {}).get("errors", []),
+            },
+        )
+        loop.call_soon_threadsafe(
+            lambda: asyncio.ensure_future(manager.broadcast(msg))
+        )
+    except Exception as e:
+        logger.warning("导入完成广播失败: %s", e)
+
+
+from bobanana.import_tasks import register_import_finish_listener  # noqa: E402
+
+register_import_finish_listener(_on_import_finished)
+
 def make_progress_callback(conn_id: int, main_loop=None):
     """创建进度回调函数 — 用 call_soon_threadsafe 在主循环上调度。"""
     if main_loop is None:
@@ -184,7 +218,12 @@ async def _send_event(conn_id: int, evt: dict):
 
 @router.websocket("/ws/chat")
 async def chat_websocket(websocket: WebSocket):
+    global _broadcast_loop
     conn_id = await manager.connect(websocket)
+    try:
+        _broadcast_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        pass
     logger.info("WebSocket 连接已建立: #%d", conn_id)
 
     # 会话记忆

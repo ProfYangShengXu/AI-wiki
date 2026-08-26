@@ -473,6 +473,11 @@ class ImportTaskManager:
                 task.result.setdefault("errors", []).append({"title": "", "reason": str(e)})
                 self._save(task)
         finally:
+            # 任务必达终态: 通知外部监听(如 WebSocket 广播导入完成事件)
+            try:
+                _notify_import_finished(task)
+            except Exception:  # noqa: BLE001
+                pass
             if old_col is not None:
                 try:
                     db_manager.switch_collection(old_col)
@@ -586,3 +591,26 @@ class ImportTaskManager:
 
 # ── 模块级单例 ────────────────────────────────────────────
 import_task_manager = ImportTaskManager()
+
+# ── 导入完成事件广播 ──────────────────────────────────────
+# 外部(如 WebSocket 路由)可注册回调, 任务到达终态时收到事件,
+# 前端无需轮询即可得知导入完成/失败。
+_import_finish_listeners: list = []
+
+
+def register_import_finish_listener(cb) -> None:
+    """注册导入完成回调: cb(task_state: dict)。"""
+    if callable(cb) and cb not in _import_finish_listeners:
+        _import_finish_listeners.append(cb)
+
+
+def _notify_import_finished(task) -> None:
+    """任务到达终态时, 通知所有已注册监听。"""
+    if task.status not in _TERMINAL:
+        return
+    state = task.to_state()
+    for cb in list(_import_finish_listeners):
+        try:
+            cb(state)
+        except Exception:  # noqa: BLE001 — 单个监听失败不影响其他
+            pass
