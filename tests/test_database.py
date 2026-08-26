@@ -82,14 +82,14 @@ async def test_list_cards_with_data():
 
 @pytest.mark.asyncio
 async def test_get_categories():
-    """分类聚合 — 分类收敛: 非规范分类归入「通用」。"""
+    """分类聚合 — 手动创建的分类被保留(支持分类手动 CRUD)。"""
     from bobanana.agent import CANONICAL_CATEGORIES
     await card_service.create_card(CardCreate(title="A1", category=CANONICAL_CATEGORIES[0]))
     await card_service.create_card(CardCreate(title="B1", category="X"))
     await card_service.create_card(CardCreate(title="A2", category=CANONICAL_CATEGORIES[0]))
 
     cats = await card_service.get_categories()
-    assert sorted(cats) == sorted([CANONICAL_CATEGORIES[0], "通用"])
+    assert sorted(cats) == sorted([CANONICAL_CATEGORIES[0], "X"])
 
 
 @pytest.mark.asyncio

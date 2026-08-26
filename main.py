@@ -34,7 +34,7 @@ def main():
 
     print(f"""
   ┌──────────────────────────────────────┐
-  │  StudyWiki-Agent v0.31.0             │
+  │  StudyWiki-Agent v0.32.0             │
   │  本地 Wiki 知识库 AI Agent           │
   │                                      │
   │  http://{args.host}:{args.port}      │
