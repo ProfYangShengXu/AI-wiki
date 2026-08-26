@@ -111,70 +111,17 @@ class GlassTheme {
     );
   }
 
-  /// 页面渐变背景 (配合 Scaffold 使用)。
+  /// 页面背景 (配合 Scaffold 使用)。
   ///
-  /// 模拟 iOS 壁纸: 线性渐变打底 + 多个强径向辉光光斑,
-  /// 光斑要足够明显, 毛玻璃卡片模糊时才有可见的"玻璃感"。
+  /// 纯渐变, 无 Stack/光斑 — 避免任何可能影响命中测试的覆盖层,
+  /// 保证所有按钮/下拉可正常交互。
   static Widget background(BuildContext context, {required Widget child}) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: dark ? darkBackgroundGradient : backgroundGradient,
       ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 极淡辉光 (alpha 8-12%), 只留一点氛围感
-          Positioned(
-            top: -140,
-            right: -100,
-            child: _glowOrb(
-              dark ? const Color(0x143B82F6) : const Color(0x1F3B82F6),
-              size: 460,
-            ),
-          ),
-          Positioned(
-            bottom: -160,
-            left: -80,
-            child: _glowOrb(
-              dark ? const Color(0x148B5CF6) : const Color(0x1F8B5CF6),
-              size: 420,
-            ),
-          ),
-          Positioned(
-            top: 200,
-            left: -140,
-            child: _glowOrb(
-              dark ? const Color(0x10EC4899) : const Color(0x1AEC4899),
-              size: 340,
-            ),
-          ),
-          Positioned(
-            bottom: 100,
-            right: -120,
-            child: _glowOrb(
-              dark ? const Color(0x0D38BDF8) : const Color(0x1438BDF8),
-              size: 300,
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
-  static Widget _glowOrb(Color color, {required double size}) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withValues(alpha: 0)],
-          ),
-        ),
-      ),
+      child: child,
     );
   }
 

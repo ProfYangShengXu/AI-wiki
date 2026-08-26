@@ -45,7 +45,8 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      // 不延伸 body 到 AppBar 后面: 避免透明 AppBar 层覆盖顶部控件
+      // (分类下拉等)导致点击被 AppBar 拦截
       appBar: AppBar(title: Text(_titles[_index])),
       body: GlassTheme.background(
         context,
