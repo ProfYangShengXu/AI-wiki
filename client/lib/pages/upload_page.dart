@@ -120,6 +120,19 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             setState(() => _lastResult = st);
             // 导入完成/失败后通知知识库列表刷新
             ref.read(dataRefreshProvider.notifier).state++;
+            // 明确提示: 成功/失败都弹 SnackBar
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    status == 'done'
+                        ? '✓ 导入完成: ${_lastResultText(st)}'
+                        : '✗ 导入${status == 'failed' ? '失败' : '已取消'}',
+                  ),
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
             return;
           }
         } catch (_) {
@@ -151,6 +164,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       default:
         return s;
     }
+  }
+
+  /// 完成结果的简短文案: 成功 X 张 · 跳过 Y 张 · 失败 Z 张。
+  String _lastResultText(Map<String, dynamic> st) {
+    final r = (st['result'] as Map?) ?? const {};
+    final imported = r['imported'] ?? 0;
+    final skipped = r['skipped'] ?? 0;
+    final failed = r['failed'] ?? 0;
+    if (imported == 0 && skipped == 0 && failed == 0) {
+      return '无新卡片';
+    }
+    return '成功 $imported 张 · 跳过 $skipped 张 · 失败 $failed 张';
   }
 
   @override

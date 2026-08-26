@@ -203,11 +203,12 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                       decoration: const InputDecoration(labelText: '标题'),
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _categories.contains(category)
-                          ? category
-                          : '通用',
-                      decoration: const InputDecoration(labelText: '分类'),
+                    // 受控下拉: setDialogState 更新 category 后 value 同步
+                    DropdownButton<String>(
+                      value: category,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      hint: const Text('分类'),
                       items: [
                         if (!_categories.contains('通用'))
                           const DropdownMenuItem(value: '通用', child: Text('通用')),
@@ -341,9 +342,13 @@ class _WikiPageState extends ConsumerState<WikiPage> {
           child: Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<String?>(
-                  initialValue: _category,
-                  decoration: const InputDecoration(labelText: '分类'),
+                // 完全受控下拉: value 每次 build 同步 _category,
+                // 避免 DropdownButtonFormField.initialValue 不随状态更新的问题
+                child: DropdownButton<String?>(
+                  value: _category,
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  hint: const Text('分类'),
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,

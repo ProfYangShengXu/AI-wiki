@@ -84,8 +84,11 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                       ),
                       const SizedBox(height: 16),
                       _label('Provider'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _provider,
+                      // 受控下拉: value 每次 build 同步 _provider
+                      DropdownButton<String>(
+                        value: _provider,
+                        isExpanded: true,
+                        underline: const SizedBox.shrink(),
                         items: const [
                           DropdownMenuItem(
                             value: 'deepseek',
@@ -154,26 +157,16 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
                       ),
                       const SizedBox(height: 12),
                       _label('模型 (Model)'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _model,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'deepseek-v4-flash',
-                            child: Text('deepseek-v4-flash（快/便宜）'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'deepseek-v4-pro',
-                            child: Text('deepseek-v4-pro（强）'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'gpt-4o-mini',
-                            child: Text('gpt-4o-mini'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'gpt-4o',
-                            child: Text('gpt-4o'),
-                          ),
-                        ],
+                      // 受控模型下拉: 选项随 provider 变化
+                      DropdownButton<String>(
+                        value: _model,
+                        isExpanded: true,
+                        underline: const SizedBox.shrink(),
+                        items: _modelOptions(_provider)
+                            .map(
+                              (m) => DropdownMenuItem(value: m, child: Text(m)),
+                            )
+                            .toList(),
                         onChanged: _busy
                             ? null
                             : (value) {
@@ -253,6 +246,26 @@ class _BootstrapPageState extends ConsumerState<BootstrapPage> {
         return ('gemini-2.0-flash', '');
       default:
         return ('deepseek-v4-flash', 'https://api.deepseek.com');
+    }
+  }
+
+  /// 各厂商可选模型列表(供下拉选择)。
+  List<String> _modelOptions(String provider) {
+    switch (provider) {
+      case 'openai':
+        return const ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'];
+      case 'kimi':
+        return const ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'];
+      case 'glm':
+        return const ['glm-4-flash', 'glm-4', 'glm-4-plus'];
+      case 'grok':
+        return const ['grok-3-mini', 'grok-3', 'grok-2'];
+      case 'anthropic':
+        return const ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-3-5-haiku'];
+      case 'gemini':
+        return const ['gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'];
+      default:
+        return const ['deepseek-v4-flash', 'deepseek-v4-pro'];
     }
   }
 

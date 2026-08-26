@@ -143,9 +143,12 @@ class _QuizPageState extends ConsumerState<QuizPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: _selectedCardId,
-            decoration: const InputDecoration(labelText: '选择卡片'),
+          // 受控下拉: value 每次 build 同步 _selectedCardId
+          DropdownButton<String>(
+            value: _selectedCardId,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            hint: const Text('选择卡片'),
             items: _cards
                 .map(
                   (c) => DropdownMenuItem(value: c.id, child: Text(c.title)),
