@@ -108,7 +108,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="StudyWiki-Agent",
     description="基于 LangChain + LangGraph 的可增长本地 Wiki 知识库 API",
-    version="0.30.0",
+    version="0.31.0",
     lifespan=lifespan,
     debug=DEBUG,
 )
@@ -244,7 +244,7 @@ async def root():
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
-    return {"service": "StudyWiki-Agent", "version": "0.30.0"}
+    return {"service": "StudyWiki-Agent", "version": "0.31.0"}
 
 
 @app.get("/api/logs")
