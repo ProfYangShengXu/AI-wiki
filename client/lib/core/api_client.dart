@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bootstrap_models.dart';
 import '../models/knowledge_card.dart';
 import '../models/pair_models.dart';
+import '../models/quiz_card.dart';
 import 'api_config.dart';
 import 'error_codes.dart';
 
@@ -261,31 +262,114 @@ class ApiClient {
     return _cardsFrom(data['cards']);
   }
 
-  Future<List<QuizQuestion>> generateQuiz(String cardId) async {
+  /// 生成 Quiz(后端会保存为 quiz 卡片), 返回 (quiz_id, questions)。
+  Future<({String quizId, List<QuizQuestion> questions})> generateQuiz(
+      String cardId) async {
     final data = await _dataOf(
       _dio.post<dynamic>('/api/quiz/generate/$cardId'),
     );
     final raw = data['questions'];
-    if (raw is List) {
-      return raw
-          .whereType<Map<String, dynamic>>()
-          .map(QuizQuestion.fromJson)
-          .toList();
-    }
-    return const [];
+    final questions = raw is List
+        ? raw
+            .whereType<Map<String, dynamic>>()
+            .map(QuizQuestion.fromJson)
+            .toList()
+        : <QuizQuestion>[];
+    return (
+      quizId: data['quiz_id']?.toString() ?? '',
+      questions: questions,
+    );
   }
 
   Future<Map<String, dynamic>> gradeQuiz({
     required String cardId,
+    String quizId = '',
     required List<Map<String, String>> answers,
   }) async {
     final data = await _dataOf(
       _dio.post<dynamic>(
         '/api/quiz/grade',
-        data: {'card_id': cardId, 'answers': answers},
+        data: {
+          'card_id': cardId,
+          if (quizId.isNotEmpty) 'quiz_id': quizId,
+          'answers': answers,
+        },
       ),
     );
     return data;
+  }
+
+  // ── Quiz 卡片(永久保存) ────────────────────────────────
+
+  Future<List<QuizCard>> listQuizzes({String cardId = ''}) async {
+    final data = await _dataOf(
+      _dio.get<dynamic>(
+        '/api/quizzes',
+        queryParameters: {if (cardId.isNotEmpty) 'card_id': cardId},
+      ),
+    );
+    final raw = data['quizzes'];
+    if (raw is List) {
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(QuizCard.fromJson)
+          .toList();
+    }
+    return const [];
+  }
+
+  Future<QuizCard> getQuiz(String quizId) async {
+    final data = await _dataOf(_dio.get<dynamic>('/api/quizzes/$quizId'));
+    return QuizCard.fromJson(data);
+  }
+
+  Future<QuizCard> createQuiz({
+    required String title,
+    List<String> cardIds = const [],
+    required List<Map<String, dynamic>> questions,
+    String source = 'agent',
+  }) async {
+    final data = await _dataOf(
+      _dio.post<dynamic>(
+        '/api/quizzes',
+        data: {
+          'title': title,
+          'card_ids': cardIds,
+          'questions': questions,
+          'source': source,
+        },
+      ),
+    );
+    return QuizCard.fromJson(data);
+  }
+
+  Future<QuizCard> updateQuiz(
+    String quizId, {
+    String? title,
+    List<String>? cardIds,
+    List<Map<String, dynamic>>? questions,
+    String? status,
+    bool? submitted,
+    bool? userEdited,
+  }) async {
+    final data = await _dataOf(
+      _dio.put<dynamic>(
+        '/api/quizzes/$quizId',
+        data: {
+          if (title != null) 'title': title,
+          if (cardIds != null) 'card_ids': cardIds,
+          if (questions != null) 'questions': questions,
+          if (status != null) 'status': status,
+          if (submitted != null) 'submitted': submitted,
+          if (userEdited != null) 'user_edited': userEdited,
+        },
+      ),
+    );
+    return QuizCard.fromJson(data);
+  }
+
+  Future<void> deleteQuiz(String quizId) async {
+    await _dataOf(_dio.delete<dynamic>('/api/quizzes/$quizId'));
   }
 
   List<KnowledgeCard> _cardsFrom(dynamic raw) {

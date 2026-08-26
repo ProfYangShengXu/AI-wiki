@@ -148,7 +148,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "start_quiz",
-        "description": "为指定的知识卡片生成 Quiz 测验题。",
+        "description": "为指定的知识卡片生成 Quiz 测验题, 并作为 quiz 卡片永久保存到 Quiz 页(返回 quiz_id 供后续读取/评分)。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -158,11 +158,24 @@ TOOLS: list[dict] = [
         }
     },
     {
-        "name": "grade_quiz",
-        "description": "对用户的 Quiz 答案进行 AI 评分。",
+        "name": "read_quiz",
+        "description": "读取已保存的 quiz 卡片内容(题目/参考答案/用户答案/评分/提交状态/创建时间)。传 quiz_id 精确读取; 传 card_id_or_title 按关联卡片筛选; 都不传则列出全部 quiz。",
         "parameters": {
             "type": "object",
             "properties": {
+                "quiz_id": {"type": "string", "description": "quiz 卡片 ID(可选)"},
+                "card_id_or_title": {"type": "string", "description": "关联知识卡片 ID 或标题(可选)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "grade_quiz",
+        "description": "对用户的 Quiz 答案进行 AI 评分, 并写回 quiz 卡片(提交状态+答案+评分, 若该卡只有一个 quiz 可不传 quiz_id)。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "quiz_id": {"type": "string", "description": "quiz 卡片 ID(可选, 该卡有多个 quiz 时建议传)"},
                 "card_id": {"type": "string", "description": "卡片ID"},
                 "answers": {"type": "array", "items": {"type": "object", "properties": {
                     "question": {"type": "string"}, "answer": {"type": "string"}
@@ -345,7 +358,21 @@ def execute_tool(tool_name: str, params: dict) -> dict:
 返回 JSON 数组: [{{"question":"","ref_answer":""}}]"""
             raw = llm_invoke("只返回 JSON 数组。", prompt, timeout_sec=30)
             qs = _parse_json_array(raw)
-            return {"card_id": card.id, "card_title": card.title, "questions": qs}
+            # 永久保存为 quiz 卡片(Quiz 页可见)
+            from bobanana import quiz_store
+            quiz = quiz_store.create_quiz_card(
+                title=card.title,
+                card_ids=[card.id],
+                questions=qs,
+                source="agent",
+            )
+            return {
+                "quiz_id": quiz["id"],
+                "card_id": card.id,
+                "card_title": card.title,
+                "questions": qs,
+                "saved": True,
+            }
 
         elif tool_name == "grade_quiz":
             card = card_service.get_card_sync(params["card_id"])
@@ -359,13 +386,75 @@ def execute_tool(tool_name: str, params: dict) -> dict:
 返回 JSON 数组: [{{"score":8,"comment":"理由","reference":"参考答案"}}]"""
             raw = llm_invoke("只返回 JSON 数组。", prompt, timeout_sec=30)
             results = _parse_json_array(raw)
-            from bobanana.routes.quiz import _mastery
+            # 掌握度落库(与 Quiz 页一致, 重启不丢)
+            from bobanana.routes.quiz import _mastery, _save_mastery
             m = _mastery.setdefault(card.id, {"attempts": 0, "score": 0})
             m["attempts"] += 1
             total = sum(r.get("score", 5) for r in results) if results else 0
             m["score"] = max(m["score"], total)
             m["max_score"] = max(int(m.get("max_score") or 0), len(results) * 10)
-            return {"results": results, "total": total, "max_score": len(results)*10}
+            _save_mastery(_mastery)
+            # 写回 quiz 卡片(提交状态 + 答案 + 评分)
+            from bobanana import quiz_store
+            target_quiz = None
+            quiz_id = params.get("quiz_id") or ""
+            if quiz_id:
+                target_quiz = quiz_store.get_quiz_card(quiz_id)
+            else:
+                linked = quiz_store.list_quiz_cards(card_id=card.id)
+                if len(linked) == 1:
+                    target_quiz = linked[0]
+            if target_quiz:
+                answers_map = {a["question"]: a["answer"] for a in params["answers"]}
+                qlist = target_quiz.get("questions") or []
+                res_map = {r.get("question", ""): r for r in (results or [])}
+                merged = []
+                for q in qlist:
+                    qq = dict(q)
+                    qq["user_answer"] = answers_map.get(q.get("question", ""), qq.get("user_answer", ""))
+                    r = res_map.get(q.get("question", ""))
+                    if r:
+                        qq["score"] = r.get("score", qq.get("score"))
+                        qq["comment"] = r.get("comment", qq.get("comment", ""))
+                        qq["ref_answer"] = r.get("reference", qq.get("ref_answer", ""))
+                    merged.append(qq)
+                quiz_store.update_quiz_card(
+                    target_quiz["id"], questions=merged,
+                    submitted=True, status="graded",
+                )
+            return {
+                "quiz_id": target_quiz["id"] if target_quiz else "",
+                "results": results, "total": total, "max_score": len(results)*10,
+                "saved": bool(target_quiz),
+            }
+
+        elif tool_name == "read_quiz":
+            from bobanana import quiz_store
+            quiz_id = params.get("quiz_id") or ""
+            card_hint = params.get("card_id_or_title") or ""
+            if quiz_id:
+                q = quiz_store.get_quiz_card(quiz_id)
+                if not q:
+                    return {"error": f"未找到 quiz: {quiz_id[:8]}"}
+                return q
+            if card_hint:
+                card = _find_card(card_hint)
+                if not card:
+                    return {"error": f"未找到卡片: {card_hint}"}
+                quizzes = quiz_store.list_quiz_cards(card_id=card.id)
+                if not quizzes:
+                    return {"error": f"卡片「{card.title}」暂无 quiz", "card_id": card.id}
+                return {"card_id": card.id, "card_title": card.title, "quizzes": quizzes}
+            quizzes = quiz_store.list_quiz_cards()
+            return {
+                "count": len(quizzes),
+                "quizzes": [
+                    {"id": q["id"], "title": q["title"], "status": q["status"],
+                     "submitted": q["submitted"], "created_at": q["created_at"],
+                     "card_ids": q["card_ids"], "question_count": len(q.get("questions") or [])}
+                    for q in quizzes
+                ],
+            }
 
         elif tool_name == "create_exam":
             cats = params.get("category_names", [])[:10]

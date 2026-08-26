@@ -25,6 +25,7 @@ from bobanana.routes import (
     history,
     knowledgebase,
     quiz,
+    quizzes,
     settings,
     upload,
 )
@@ -63,6 +64,13 @@ async def lifespan(app: FastAPI):
     # ── ChromaDB 初始化 ───────────────────────────────
     await db_manager.startup()
     logger.info("数据库就绪 | 卡片总数: %d", db_manager.count())
+
+    # ── Quiz 卡片存储初始化 (幂等) ────────────────────
+    try:
+        from bobanana import quiz_store
+        quiz_store.init_db()
+    except Exception as e:
+        logger.warning("quiz_cards 初始化失败(不影响启动): %s", e)
 
     # ── 存量分类收敛迁移 (幂等) ──────────────────────
     try:
@@ -236,6 +244,7 @@ app.include_router(history.router)
 app.include_router(upload.router)
 app.include_router(chat.router)
 app.include_router(quiz.router)
+app.include_router(quizzes.router)
 app.include_router(settings.router)
 app.include_router(knowledgebase.router)
 app.include_router(backup.router)  # 备份 / 恢复路由 (Phase 2 §4)

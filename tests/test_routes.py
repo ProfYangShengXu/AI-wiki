@@ -166,7 +166,8 @@ class TestErrorHandling:
         assert resp.status_code == 404
 
     def test_405(self):
-        resp = client.put("/api/categories")
+        # PATCH 未注册 → 方法不允许(405)
+        resp = client.patch("/api/categories")
         assert resp.status_code == 405
 
     def test_invalid_card_id(self):

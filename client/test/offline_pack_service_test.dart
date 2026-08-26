@@ -14,6 +14,7 @@ class _FakeApiClient extends ApiClient {
   @override
   Future<Map<String, dynamic>> gradeQuiz({
     required String cardId,
+    String quizId = '',
     required List<Map<String, String>> answers,
   }) async {
     gradeCalls++;

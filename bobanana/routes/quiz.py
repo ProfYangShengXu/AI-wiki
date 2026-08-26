@@ -100,6 +100,7 @@ class QuizAnswer(BaseModel):
 
 class QuizSubmission(BaseModel):
     card_id: str
+    quiz_id: str = ""  # 可选: 关联的 quiz 卡片 id(有则把答案/评分写回该卡片)
     answers: list[QuizAnswer]
 
 
@@ -190,7 +191,19 @@ async def generate_quiz(card_id: str):
         questions = _json.loads(clean)
         if not isinstance(questions, list):
             raise ValueError("非数组")
-        return ApiResponse(status="success", data={"card_id": card_id, "questions": questions})
+        # 持久化为 quiz 卡片(Quiz 页永久保存)
+        from bobanana import quiz_store
+        quiz = quiz_store.create_quiz_card(
+            title=card.title,
+            card_ids=[card_id],
+            questions=questions,
+            source="quizpage",
+        )
+        return ApiResponse(status="success", data={
+            "quiz_id": quiz["id"],
+            "card_id": card_id,
+            "questions": questions,
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成失败: {e}") from None
 
@@ -251,13 +264,50 @@ async def grade_quiz(submission: QuizSubmission):
                 reference=r.get("reference", ""),
             ))
 
-        # 更新掌握度
+        # 更新掌握度(落库)
         m = _mastery.setdefault(submission.card_id, {"attempts": 0, "score": 0})
         m["attempts"] += 1
         m["score"] = max(m["score"], total_score)  # 保留最高分
         m["max_score"] = max(int(m.get("max_score") or 0), max_score)
         _save_mastery(_mastery)
         mastery_pct = _mastery_percent(m)
+
+        # 写回 quiz 卡片: 提交状态 + 用户答案 + 每题评分
+        try:
+            from bobanana import quiz_store
+            target_quiz = None
+            if submission.quiz_id:
+                target_quiz = quiz_store.get_quiz_card(submission.quiz_id)
+            else:
+                linked = quiz_store.list_quiz_cards(card_id=submission.card_id)
+                if len(linked) == 1:
+                    target_quiz = linked[0]
+            if target_quiz:
+                qlist = target_quiz.get("questions") or []
+                graded_map = {g.question: g for g in graded}
+                merged = []
+                for q in qlist:
+                    qq = dict(q)
+                    g = graded_map.get(q.get("question", ""))
+                    if g:
+                        qq["user_answer"] = g.answer
+                        qq["score"] = g.score
+                        qq["comment"] = g.comment
+                        qq["ref_answer"] = g.reference or qq.get("ref_answer", "")
+                    merged.append(qq)
+                # 若题目数不一致(LLM 返回数 != 卡片题数), 补全缺失项
+                for g in graded:
+                    if not any(x.get("question") == g.question for x in merged):
+                        merged.append({
+                            "question": g.question, "ref_answer": g.reference,
+                            "user_answer": g.answer, "score": g.score, "comment": g.comment,
+                        })
+                quiz_store.update_quiz_card(
+                    target_quiz["id"], questions=merged,
+                    submitted=True, status="graded",
+                )
+        except Exception:  # noqa: BLE001 — 写回失败不影响评分主流程
+            pass
 
         try:
             from bobanana.observability import metrics

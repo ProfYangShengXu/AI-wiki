@@ -10,6 +10,14 @@ from bobanana.models import CardCreate
 from bobanana.service.card_service import card_service
 
 
+@pytest.fixture(autouse=True)
+def isolated_quiz_db(tmp_path, monkeypatch):
+    """generate 现在会写 quiz 卡片, 用独立 SQLite 避免污染真实 DATA_DIR。"""
+    from bobanana import quiz_store
+    monkeypatch.setattr(quiz_store, "DB_PATH", tmp_path / "quiz_cards.db")
+    quiz_store.init_db()
+
+
 @pytest.fixture
 def quiz_env(monkeypatch):
     from tests.fakes import FakeLLM

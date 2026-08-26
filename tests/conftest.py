@@ -26,6 +26,18 @@ TEST_SUITE_COLLECTION = "test_suite_cards"
 
 
 @pytest.fixture(autouse=True)
+def isolated_quiz_storage(tmp_path, monkeypatch):
+    """Quiz 卡片(SQLite)与掌握度(mastery.json)落盘隔离到 tmp, 不污染真实 DATA_DIR。"""
+    from bobanana import quiz_store
+    from bobanana.routes import quiz as quiz_routes
+
+    monkeypatch.setattr(quiz_store, "DB_PATH", tmp_path / "quiz_cards.db")
+    monkeypatch.setattr(quiz_routes, "MASTERY_FILE", tmp_path / "mastery.json")
+    quiz_store.init_db()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def isolated_chroma(tmp_path, monkeypatch):
     """函数级隔离 ChromaDB。
 
