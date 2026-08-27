@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/knowledge_card.dart';
 import '../services/offline_pack_service.dart';
+import '../widgets/app_snackbar.dart';
 
 /// 离线知识库：浏览本地缓存的离线包卡片，支持重新导出。
 class OfflinePackPage extends ConsumerStatefulWidget {
@@ -56,18 +57,14 @@ class _OfflinePackPageState extends ConsumerState<OfflinePackPage> {
         _cards = pack.cards;
         _loading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导出并缓存 ${pack.cardCount} 张卡片')),
-      );
+      AppSnack.info(context, '已导出并缓存 ${pack.cardCount} 张卡片');
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = e.toString();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出失败: $e')),
-      );
+      AppSnack.error(context, '导出失败: $e');
     }
   }
 

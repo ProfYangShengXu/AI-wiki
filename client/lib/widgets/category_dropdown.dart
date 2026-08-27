@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// 分类下拉选择器 — 圆角深灰底、浅灰字、自带滚动条。
+/// 分类下拉选择器 — 圆角、自带滚动条, 颜色随主题自适应。
 ///
 /// 基于 Material 3 的 [DropdownMenu] 实现:
-/// - 按钮本体圆角深灰底 + 浅灰字, 深浅色模式统一;
-/// - 菜单圆角深灰底, 内容超出 [menuHeight] 时自动出现滚动条;
+/// - 按钮/菜单圆角, 内容超出 [menuHeight] 时自动出现滚动条;
+/// - 暗色主题: 深灰底 + 浅灰字; 亮色主题: 浅底 + 深灰字(不再出现"亮底暗底混搭");
 /// - 外部状态通过 `key: ValueKey(selection)` 强制同步
 ///   ([DropdownMenu.initialSelection] 只在首次 build 生效)。
 class CategoryDropdown extends StatelessWidget {
@@ -35,12 +35,15 @@ class CategoryDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final current = value ?? _all;
-    // 深灰底 / 浅灰字 — 深浅色模式统一风格, 深色模式略深一档
-    final bg = dark ? const Color(0xFF23262E) : const Color(0xFF2A2D36);
-    final menuBg = dark ? const Color(0xFF1E2128) : const Color(0xFF2F333C);
-    final fg = const Color(0xFFD7DAE0);
+    // 主题自适应: 暗色深灰底浅灰字; 亮色近白底深灰字
+    final bg = dark ? const Color(0xFF23262E) : const Color(0xFFFFFFFF);
+    final menuBg = dark ? const Color(0xFF1E2128) : const Color(0xFFFFFFFF);
+    final fg = dark ? const Color(0xFFD7DAE0) : const Color(0xFF1F2937);
+    final border =
+        dark ? const Color(0xFF3A3F4B) : const Color(0xFFE4E6EA);
 
     return DropdownMenu<String>(
       key: ValueKey('cat_$current'),
@@ -72,7 +75,7 @@ class CategoryDropdown extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF5B6478), width: 1),
+          borderSide: BorderSide(color: scheme.primary, width: 1),
         ),
       ),
       menuStyle: MenuStyle(
@@ -82,10 +85,7 @@ class CategoryDropdown extends StatelessWidget {
         ),
         elevation: const WidgetStatePropertyAll(8),
         side: WidgetStatePropertyAll(
-          BorderSide(
-            color: const Color(0xFF3A3F4B).withValues(alpha: 0.6),
-            width: 0.5,
-          ),
+          BorderSide(color: border.withValues(alpha: 0.6), width: 0.5),
         ),
       ),
       trailingIcon: Icon(Icons.keyboard_arrow_down_rounded, color: fg),

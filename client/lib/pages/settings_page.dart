@@ -7,6 +7,7 @@ import '../services/sidecar_service.dart';
 import '../state/bootstrap_controller.dart';
 import 'offline_pack_page.dart';
 import 'pairing_page.dart';
+import '../widgets/app_snackbar.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -237,9 +238,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             FilledButton(
               onPressed: () {
                 if (keyCtrl.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('请填写 API Key')),
-                  );
+                  AppSnack.error(context, '请填写 API Key');
                   return;
                 }
                 Navigator.pop(ctx, true);
@@ -264,15 +263,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await ref.read(apiClientProvider).saveSettings(updates);
       await ref.read(bootstrapControllerProvider.notifier).load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✓ 已切换, 即时生效')),
-        );
+        AppSnack.info(context, '✓ 已切换, 即时生效');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('切换失败: $e')),
-        );
+        AppSnack.error(context, '切换失败: $e');
       }
     }
   }
@@ -332,9 +327,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onPressed: () async {
                 final r = await SidecarService.instance.ensureBackendRunning();
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(r.message)),
-                );
+                if (r.ok) {
+                  AppSnack.info(context, r.message);
+                } else {
+                  AppSnack.error(context, r.message);
+                }
               },
             ),
             OutlinedButton.icon(
@@ -343,9 +340,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onPressed: () async {
                 await SidecarService.instance.stopSidecar();
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('已停止后端服务')),
-                );
+                AppSnack.info(context, '已停止后端服务');
               },
             ),
           ],
@@ -375,34 +370,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _exportPack(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       final pack = await ref.read(offlinePackServiceProvider).exportAndSave();
-      messenger.showSnackBar(
-        SnackBar(content: Text('已导出 ${pack.cardCount} 张卡片到本地缓存')),
-      );
+      if (context.mounted) {
+        AppSnack.info(context, '已导出 ${pack.cardCount} 张卡片到本地缓存');
+      }
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('导出失败: $e')),
-      );
+      if (context.mounted) {
+        AppSnack.error(context, '导出失败: $e');
+      }
     }
   }
 
   Future<void> _flushGrades(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       final result = await ref.read(offlinePackServiceProvider).flushPendingGrades();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '回传完成：成功 ${result.sent} 条，失败 ${result.failed} 条，剩余 ${result.remaining} 条',
-          ),
-        ),
-      );
+      if (context.mounted) {
+        AppSnack.info(
+          context,
+          '回传完成：成功 ${result.sent} 条，失败 ${result.failed} 条，剩余 ${result.remaining} 条',
+        );
+      }
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('回传失败: $e')),
-      );
+      if (context.mounted) {
+        AppSnack.error(context, '回传失败: $e');
+      }
     }
   }
 }

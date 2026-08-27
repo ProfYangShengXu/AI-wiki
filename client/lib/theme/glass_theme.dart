@@ -161,7 +161,8 @@ class GlassTheme {
       fontFamily: 'PingFang SC', // 中文用苹方, 缺失时走 fallback
       fontFamilyFallback: zhFallback,
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
+        // 亮色: 白底黑字; 暗色: 深灰底浅字(与 body 渐变顶部一致, 不再露出黑底)
+        backgroundColor: dark ? const Color(0xFF111318) : const Color(0xFFF2F3F5),
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -172,6 +173,14 @@ class GlassTheme {
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        // 提示类: 白底黑字; 报错类走 showErrorSnack 红底黑字
+        backgroundColor: Colors.white,
+        contentTextStyle: const TextStyle(color: Colors.black),
+        actionTextColor: const Color(0xFF111827),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       cardTheme: CardThemeData(
         elevation: 0,

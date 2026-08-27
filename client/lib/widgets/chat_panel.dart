@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/api_client.dart';
@@ -11,6 +12,7 @@ import '../models/ws_event.dart';
 import '../services/app_logger.dart';
 import '../state/refresh.dart';
 import '../theme/glass_theme.dart';
+import 'app_snackbar.dart';
 import '../widgets/markdown_text.dart';
 
 class _ToolStep {
@@ -99,9 +101,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
         _onEvent,
         onError: (_) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('对话连接中断，请稍后重试')),
-            );
+            AppSnack.error(context, '对话连接中断，请稍后重试');
           }
         },
         onDone: () => _channel = null,
@@ -311,9 +311,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
       try {
         AppLogger.log('聊天导入异常: $e\n$st');
       } catch (_) {}
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('上传失败: $e')),
-      );
+      AppSnack.error(context, '上传失败: $e');
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -481,11 +479,20 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     if (item.role == 'system') {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(
-          item.text,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.error),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                item.text,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.error),
+              ),
+            ),
+            if (item.text.isNotEmpty)
+              _CopyButton(text: item.text, iconSize: 14),
+          ],
         ),
       );
     }
@@ -538,7 +545,17 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
               opacity: 0.5,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: bubbleContent,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    bubbleContent,
+                    if (!item.streaming && item.text.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _CopyButton(text: item.text),
+                      ),
+                  ],
+                ),
               ),
             ),
     );
@@ -619,6 +636,36 @@ class _ModeButton extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// 复制到剪贴板的小按钮。
+class _CopyButton extends StatelessWidget {
+  const _CopyButton({required this.text, this.iconSize = 16});
+
+  final String text;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: text));
+        if (context.mounted) {
+          AppSnack.info(context, '已复制到剪贴板');
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          Icons.copy_rounded,
+          size: iconSize,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );

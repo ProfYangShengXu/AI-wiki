@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../models/quiz_card.dart';
 import '../theme/glass_theme.dart';
+import '../widgets/app_snackbar.dart';
 
 /// Quiz 卡片详情页 — 查看/编辑题目、作答、提交评分、查看评分。
 class QuizDetailPage extends ConsumerStatefulWidget {
@@ -28,9 +29,11 @@ class QuizDetailPage extends ConsumerStatefulWidget {
 
 class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
   late QuizCard _quiz = widget.quiz;
-  late final List<TextEditingController> _questionCtrls;
-  late final List<TextEditingController> _refCtrls;
-  late final List<TextEditingController> _answerCtrls;
+  // 注意: 不能用 late final —— _syncCtrls 会在保存/评分后重新赋值,
+  // late final 二次赋值会抛 LateInitializationError(表现为"保存失败")。
+  late List<TextEditingController> _questionCtrls;
+  late List<TextEditingController> _refCtrls;
+  late List<TextEditingController> _answerCtrls;
   bool _editMode = false;
   bool _showRef = false;
   bool _busy = false;
@@ -81,7 +84,7 @@ class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
   Future<void> _saveDraft() async {
     final questions = _buildQuestions(withAnswers: true);
     if (questions.any((q) => (q['question'] as String).isEmpty)) {
-      _snack('题目不能为空');
+      _snack('题目不能为空', error: true);
       return;
     }
     setState(() => _busy = true);
@@ -105,7 +108,7 @@ class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      _snack('保存失败: $e');
+      _snack('保存失败: $e', error: true);
     }
   }
 
@@ -118,7 +121,7 @@ class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
         },
     ];
     if (answers.any((a) => (a['answer'] as String).isEmpty)) {
-      _snack('请先填写所有答案');
+      _snack('请先填写所有答案', error: true);
       return;
     }
     setState(() => _busy = true);
@@ -141,7 +144,7 @@ class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      _snack('评分失败: $e');
+      _snack('评分失败: $e', error: true);
     }
   }
 
@@ -167,7 +170,7 @@ class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
       widget.onChanged?.call();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      _snack('删除失败: $e');
+      _snack('删除失败: $e', error: true);
     }
   }
 
@@ -176,9 +179,9 @@ class _QuizDetailPageState extends ConsumerState<QuizDetailPage> {
     _initCtrls(questions);
   }
 
-  void _snack(String msg) {
+  void _snack(String msg, {bool error = false}) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      error ? AppSnack.error(context, msg) : AppSnack.info(context, msg);
     }
   }
 

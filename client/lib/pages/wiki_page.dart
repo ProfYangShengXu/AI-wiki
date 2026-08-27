@@ -8,6 +8,7 @@ import '../theme/glass_theme.dart';
 import '../widgets/category_dropdown.dart';
 import '../widgets/chat_panel.dart';
 import '../widgets/markdown_text.dart';
+import '../widgets/app_snackbar.dart';
 
 class WikiPage extends ConsumerStatefulWidget {
   const WikiPage({super.key, this.reloadNotifier});
@@ -111,15 +112,11 @@ class _WikiPageState extends ConsumerState<WikiPage> {
       await ref.read(apiClientProvider).updateCard(card.id, updated);
       ref.read(dataRefreshProvider.notifier).state++;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('卡片已更新')),
-        );
+        AppSnack.info(context, '卡片已更新');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
+        AppSnack.error(context, '更新失败: $e');
       }
     }
   }
@@ -139,9 +136,7 @@ class _WikiPageState extends ConsumerState<WikiPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败: $e')),
-        );
+        AppSnack.error(context, '创建失败: $e');
       }
     }
   }
@@ -189,7 +184,7 @@ class _WikiPageState extends ConsumerState<WikiPage> {
         ref.read(dataRefreshProvider.notifier).state++;
         _load();
       } catch (e) {
-        _snack('新建分类失败: $e');
+        _snack('新建分类失败: $e', error: true);
       }
     } else if (action == 'rename') {
       final oldName = _category!;
@@ -200,7 +195,7 @@ class _WikiPageState extends ConsumerState<WikiPage> {
         ref.read(dataRefreshProvider.notifier).state++;
         _load();
       } catch (e) {
-        _snack('重命名失败: $e');
+        _snack('重命名失败: $e', error: true);
       }
     } else if (action == 'delete') {
       final name = _category!;
@@ -226,7 +221,7 @@ class _WikiPageState extends ConsumerState<WikiPage> {
         ref.read(dataRefreshProvider.notifier).state++;
         _load();
       } catch (e) {
-        _snack('删除分类失败: $e');
+        _snack('删除分类失败: $e', error: true);
       }
     }
   }
@@ -255,9 +250,9 @@ class _WikiPageState extends ConsumerState<WikiPage> {
     return result;
   }
 
-  void _snack(String msg) {
+  void _snack(String msg, {bool error = false}) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      error ? AppSnack.error(context, msg) : AppSnack.info(context, msg);
     }
   }
 
@@ -285,15 +280,11 @@ class _WikiPageState extends ConsumerState<WikiPage> {
       ref.read(dataRefreshProvider.notifier).state++;
       setState(() => _selected = null);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('卡片已删除')),
-        );
+        AppSnack.info(context, '卡片已删除');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
-        );
+        AppSnack.error(context, '删除失败: $e');
       }
     }
   }
@@ -553,6 +544,16 @@ class _WikiPageState extends ConsumerState<WikiPage> {
                 ),
               ),
               Chip(label: Text(card.category)),
+              IconButton(
+                tooltip: '复制内容',
+                onPressed: () {
+                  copyToClipboard(
+                    '${card.title}\n\n${card.content}',
+                  );
+                  AppSnack.info(context, '已复制到剪贴板');
+                },
+                icon: const Icon(Icons.copy_rounded),
+              ),
               IconButton(
                 tooltip: '编辑',
                 onPressed: () => _editCard(card),

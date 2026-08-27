@@ -7,6 +7,7 @@ import '../core/api_client.dart';
 import '../models/knowledge_card.dart';
 import '../models/quiz_card.dart';
 import '../theme/glass_theme.dart';
+import '../widgets/app_snackbar.dart';
 import 'quiz_detail_page.dart';
 
 /// Quiz 页 — 关键词搜索知识卡片(按重合度排序)生成 Quiz + 已保存 quiz 卡片列表。
@@ -145,9 +146,7 @@ class _QuizPageState extends ConsumerState<QuizPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _generating = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('生成失败: $e')),
-      );
+      AppSnack.error(context, '生成失败: $e');
     }
   }
 
@@ -187,9 +186,7 @@ class _QuizPageState extends ConsumerState<QuizPage> {
       _loadQuizzes();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
-        );
+        AppSnack.error(context, '删除失败: $e');
       }
     }
   }
