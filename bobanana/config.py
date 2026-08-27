@@ -142,7 +142,10 @@ AGENT_MAX_WALL_TIME_SEC: int = int(os.getenv("AGENT_MAX_WALL_TIME_SEC", "120"))
 APPROVAL_TIMEOUT_SEC: int = int(os.getenv("APPROVAL_TIMEOUT_SEC", "60"))
 
 # ── 服务配置 ─────────────────────────────────────────────────
-HOST: str = os.getenv("HOST", "127.0.0.1")
+# 默认监听 0.0.0.0: 手机端经局域网连电脑后端(扫码配对)。
+# 注意: 暴露到局域网意味着同网段设备可访问本服务(含 LLM 调用额度)。
+# 如仅本机使用, 可设环境变量 HOST=127.0.0.1 收紧。
+HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8000"))
 STUDYWIKI_AUTH_TOKEN: str = os.getenv("STUDYWIKI_AUTH_TOKEN", "")
 

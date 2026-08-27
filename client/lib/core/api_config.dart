@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../services/server_config.dart';
+
 /// 后端地址解析。
 ///
 /// 优先级：
@@ -15,6 +17,10 @@ class ApiConfig {
   static String get baseUrl {
     if (_defined.isNotEmpty) {
       return _withoutTrailingSlash(_defined);
+    }
+    final saved = ServerConfig.baseUrl;
+    if (saved != null && saved.isNotEmpty) {
+      return _withoutTrailingSlash(saved);
     }
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:8000';

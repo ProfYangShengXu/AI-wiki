@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -6,6 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_client.dart';
 import '../core/api_config.dart';
 import '../models/pair_models.dart';
+import '../services/server_config.dart';
+import '../state/bootstrap_controller.dart';
+import '../widgets/app_snackbar.dart';
+import 'qr_scan_page.dart';
 
 /// 配对页：6 位配对码输入 + 配对二维码生成 + 服务器地址配置。
 ///
@@ -73,6 +79,24 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     });
   }
 
+  /// 扫码配对: 扫描电脑端二维码 → 解析出 server + code → 自动验证。
+  Future<void> _scanQr() async {
+    final raw = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const QrScanPage()),
+    );
+    if (raw == null || !mounted) return;
+    final payload = PairPayload.decode(raw);
+    if (payload == null) {
+      if (mounted) AppSnack.error(context, '无法识别的二维码, 请扫描配对二维码');
+      return;
+    }
+    setState(() {
+      _serverController.text = payload.server;
+      _codeController.text = payload.code;
+    });
+    await _verify();
+  }
+
   Future<void> _verify() async {
     final code = PairCode.normalize(_codeController.text);
     if (!PairCode.isValid(code)) {
@@ -106,6 +130,17 @@ class _PairingPageState extends ConsumerState<PairingPage> {
         _resultMessage = result.message;
         _resultError = !result.ok;
       });
+      if (result.ok) {
+        // 持久化服务器地址 + 通知全局 ApiClient 切换 baseUrl
+        await ServerConfig.save(server);
+        ref.read(serverBaseUrlProvider.notifier).state = server;
+        // 重新检查 bootstrap(后端已可达则直接进入主界面)
+        ref.read(bootstrapControllerProvider.notifier).load();
+        if (mounted) {
+          AppSnack.info(context, '配对成功, 已连接 $server');
+          Navigator.of(context).pop();
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -151,6 +186,13 @@ class _PairingPageState extends ConsumerState<PairingPage> {
                   counterText: '',
                 ),
               ),
+              const SizedBox(height: 8),
+              if (Platform.isAndroid || Platform.isIOS)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _scanQr,
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('扫码配对(推荐)'),
+                ),
               const SizedBox(height: 8),
               FilledButton.icon(
                 onPressed: _busy ? null : _verify,

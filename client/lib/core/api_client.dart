@@ -7,6 +7,7 @@ import '../models/bootstrap_models.dart';
 import '../models/knowledge_card.dart';
 import '../models/pair_models.dart';
 import '../models/quiz_card.dart';
+import '../services/server_config.dart';
 import 'api_config.dart';
 import 'error_codes.dart';
 
@@ -97,11 +98,11 @@ String _connectionErrorMessage(DioException error) {
 }
 
 class ApiClient {
-  ApiClient({Dio? dio})
+  ApiClient({Dio? dio, String? baseUrl})
       : _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: ApiConfig.baseUrl,
+                baseUrl: baseUrl ?? ApiConfig.baseUrl,
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 30),
                 sendTimeout: const Duration(seconds: 15),
@@ -541,6 +542,12 @@ String _withoutTrailingSlash(String value) {
   return value.endsWith('/') ? value.substring(0, value.length - 1) : value;
 }
 
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+/// 运行时服务器地址: 配对/手动配置后更新, 触发 apiClientProvider 重建
+/// (新的 Dio baseUrl 指向电脑后端)。
+final serverBaseUrlProvider = StateProvider<String?>((ref) => ServerConfig.baseUrl);
+
+final apiClientProvider = Provider<ApiClient>(
+  (ref) => ApiClient(baseUrl: ref.watch(serverBaseUrlProvider)),
+);
 
 final pairApiProvider = Provider<PairApi>((ref) => PairApi());

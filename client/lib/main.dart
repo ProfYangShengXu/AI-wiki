@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'services/app_logger.dart';
+import 'services/server_config.dart';
 import 'services/sidecar_service.dart';
 import 'services/tray_service.dart';
 import 'services/win32_window.dart';
@@ -46,6 +47,9 @@ Future<void> main() async {
     AppLogger.log('客户端启动 pid=$pid');
     try {
       WidgetsFlutterBinding.ensureInitialized();
+
+      // 启动前加载运行时服务器地址(真机配对/手动配置), 供 ApiConfig 使用。
+      await ServerConfig.load();
 
       // 单实例检查: 已有实例运行则退出
       if (Platform.isWindows && !_acquireSingleInstanceLock()) {
