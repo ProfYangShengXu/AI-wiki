@@ -1,10 +1,10 @@
 @echo off
-title StudyWiki-Agent v1.0.0 Installer
+title StudyWiki-Agent v1.0.1 Installer
 cd /d "%~dp0"
 
 echo.
 echo    =========================================
-echo      StudyWiki-Agent v1.0.0
+echo      StudyWiki-Agent v1.0.1
 echo      Local Knowledge Base AI Installer
 echo    =========================================
 echo.
