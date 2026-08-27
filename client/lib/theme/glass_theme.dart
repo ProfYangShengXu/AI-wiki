@@ -143,8 +143,15 @@ class GlassTheme {
       surface: dark ? const Color(0xFF1A2233) : const Color(0xFFF8FAFF),
     );
     final baseText = dark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937);
-    // 中文首选 PingFang SC (macOS/iOS), Windows 回退微软雅黑/系统无衬线
-    const zhFallback = ['PingFang SC', 'Microsoft YaHei', 'Segoe UI'];
+    // 中文首选 PingFang SC (macOS/iOS), Windows 回退微软雅黑,
+    // Linux/其他回退 Noto Sans CJK / WenQuanYi (系统装有对应字体时生效)
+    const zhFallback = [
+      'PingFang SC',
+      'Microsoft YaHei',
+      'Noto Sans CJK SC',
+      'WenQuanYi Micro Hei',
+      'Segoe UI',
+    ];
 
     return ThemeData(
       useMaterial3: true,

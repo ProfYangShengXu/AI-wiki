@@ -26,16 +26,22 @@ class _WikiPageState extends ConsumerState<WikiPage> {
   KnowledgeCard? _selected;
   bool _loading = true;
   String? _error;
+  late final ProviderSubscription<int> _refreshSub;
 
   @override
   void initState() {
     super.initState();
     widget.reloadNotifier?.addListener(_onReloadSignal);
+    // 监听导入完成/CRUD 的刷新信号。用 listenManual + initState(而非 build 里
+    // ref.listen), 避免依赖残留导致 InheritedWidget notifyClients 断言崩溃。
+    _refreshSub =
+        ref.listenManual<int>(dataRefreshProvider, (_, __) => _load());
     _load();
   }
 
   @override
   void dispose() {
+    _refreshSub.close();
     widget.reloadNotifier?.removeListener(_onReloadSignal);
     super.dispose();
   }
@@ -381,8 +387,6 @@ class _WikiPageState extends ConsumerState<WikiPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听数据刷新信号(导入完成等),自动重新加载
-    ref.listen<int>(dataRefreshProvider, (_, __) => _load());
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }

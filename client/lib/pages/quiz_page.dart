@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +9,7 @@ import '../models/quiz_card.dart';
 import '../theme/glass_theme.dart';
 import 'quiz_detail_page.dart';
 
-/// Quiz 页 — 生成 Quiz(自动保存为 quiz 卡片) + 已保存 quiz 卡片列表。
+/// Quiz 页 — 关键词搜索知识卡片(按重合度排序)生成 Quiz + 已保存 quiz 卡片列表。
 class QuizPage extends ConsumerStatefulWidget {
   const QuizPage({super.key});
 
@@ -16,10 +18,14 @@ class QuizPage extends ConsumerStatefulWidget {
 }
 
 class _QuizPageState extends ConsumerState<QuizPage> {
-  List<KnowledgeCard> _cards = const [];
-  String? _selectedCardId;
+  final _searchCtrl = TextEditingController();
+  Timer? _debounce;
+  KnowledgeCard? _selectedCard;
+  List<KnowledgeCard> _searchResults = const [];
+  bool _searching = false;
+  bool _showDropdown = false;
+
   List<QuizCard> _quizzes = const [];
-  bool _loadingCards = true;
   bool _loadingQuizzes = true;
   bool _generating = false;
   Map<String, String> _cardTitles = const {};
@@ -27,25 +33,26 @@ class _QuizPageState extends ConsumerState<QuizPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadQuizzes();
+    _loadCardTitles();
   }
 
-  Future<void> _load() async {
-    await Future.wait([_loadCards(), _loadQuizzes()]);
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadCards() async {
+  Future<void> _loadCardTitles() async {
     try {
       final cards = await ref.read(apiClientProvider).listCards(limit: 200);
       if (!mounted) return;
       setState(() {
-        _cards = cards;
         _cardTitles = {for (final c in cards) c.id: c.title};
-        _loadingCards = false;
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingCards = false);
+      // 标题映射失败不阻断主流程。
     }
   }
 
@@ -63,32 +70,78 @@ class _QuizPageState extends ConsumerState<QuizPage> {
     }
   }
 
+  // ── 关键词搜索(重合度排序) ────────────────────────────
+
+  void _onSearchChanged(String text) {
+    _debounce?.cancel();
+    final q = text.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _searchResults = const [];
+        _showDropdown = false;
+        _searching = false;
+        if (_selectedCard != null) {
+          // 清空输入时保留已选卡片, 但回退显示其标题
+          _searchCtrl.text = _selectedCard!.title;
+        }
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 300), () => _search(q));
+  }
+
+  Future<void> _search(String q) async {
+    setState(() {
+      _searching = true;
+      _showDropdown = true;
+    });
+    try {
+      final results = await ref.read(apiClientProvider).searchCards(q);
+      if (!mounted || _searchCtrl.text.trim() != q) return;
+      setState(() {
+        _searchResults = results;
+        _searching = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _searchResults = const [];
+        _searching = false;
+      });
+    }
+  }
+
+  void _selectCard(KnowledgeCard card) {
+    setState(() {
+      _selectedCard = card;
+      _searchCtrl.text = card.title;
+      _showDropdown = false;
+      _searchResults = const [];
+    });
+  }
+
   /// 生成 Quiz(后端保存为 quiz 卡片) → 刷新列表并打开详情。
   Future<void> _generate() async {
-    final cardId = _selectedCardId;
-    if (cardId == null) return;
+    final card = _selectedCard;
+    if (card == null) return;
     setState(() => _generating = true);
     try {
-      final result = await ref.read(apiClientProvider).generateQuiz(cardId);
+      final result = await ref.read(apiClientProvider).generateQuiz(card.id);
       if (!mounted) return;
       setState(() => _generating = false);
       await _loadQuizzes();
       if (!mounted) return;
-      // 用返回的 quiz_id 打开详情(后端已入库)
-      final quizzes = _quizzes;
       QuizCard? created;
       if (result.quizId.isNotEmpty) {
-        for (final q in quizzes) {
+        for (final q in _quizzes) {
           if (q.id == result.quizId) {
             created = q;
             break;
           }
         }
       }
-      created ??= quizzes.isNotEmpty ? quizzes.first : null;
-      if (created != null) {
-        _openDetail(created);
-      }
+      created ??= _quizzes.isNotEmpty ? _quizzes.first : null;
+      if (created != null) _openDetail(created);
     } catch (e) {
       if (!mounted) return;
       setState(() => _generating = false);
@@ -111,44 +164,61 @@ class _QuizPageState extends ConsumerState<QuizPage> {
     );
   }
 
+  /// ① 删除 quiz 卡片(列表页入口)。
+  Future<void> _deleteQuiz(QuizCard quiz) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除 Quiz'),
+        content: Text('确定删除「${quiz.title}」吗？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('删除')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(apiClientProvider).deleteQuiz(quiz.id);
+      _loadQuizzes();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loadingCards && _loadingQuizzes) {
-      return const Center(child: CircularProgressIndicator());
-    }
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 卡片选择 + 生成(生成即保存为 quiz 卡片)
+          // 关键词搜索 + 生成(生成即保存为 quiz 卡片)
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: DropdownButton<String>(
-                  value: _selectedCardId,
-                  isExpanded: true,
-                  underline: const SizedBox.shrink(),
-                  hint: const Text('选择卡片'),
-                  items: _cards
-                      .map((c) =>
-                          DropdownMenuItem(value: c.id, child: Text(c.title)))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() => _selectedCardId = value);
-                  },
-                ),
-              ),
+              Expanded(child: _buildSearchArea()),
               const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _selectedCardId == null || _generating
-                    ? null
-                    : _generate,
-                child: Text(_generating ? '生成中...' : '生成 Quiz'),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: FilledButton(
+                  onPressed: _selectedCard == null || _generating
+                      ? null
+                      : _generate,
+                  child: Text(_generating ? '生成中...' : '生成 Quiz'),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             '已保存的 Quiz 卡片',
             style: Theme.of(context)
@@ -163,12 +233,112 @@ class _QuizPageState extends ConsumerState<QuizPage> {
     );
   }
 
+  /// 搜索框 + 重合度排序下拉。
+  Widget _buildSearchArea() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _searchCtrl,
+          onChanged: _onSearchChanged,
+          onTap: () {
+            if (_selectedCard != null && _searchCtrl.text.isNotEmpty) {
+              _searchCtrl.clear();
+            }
+          },
+          decoration: InputDecoration(
+            hintText: '输入关键词搜索知识卡片',
+            prefixIcon: const Icon(Icons.search, size: 20),
+            isDense: true,
+            suffixIcon: _selectedCard != null
+                ? IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: '清除选择',
+                    onPressed: () {
+                      setState(() {
+                        _selectedCard = null;
+                        _searchCtrl.clear();
+                        _showDropdown = false;
+                      });
+                    },
+                  )
+                : null,
+          ),
+        ),
+        if (_showDropdown) _buildDropdown(),
+      ],
+    );
+  }
+
+  /// 重合度排序的下拉列表(后端混合检索已按相关度排序)。
+  Widget _buildDropdown() {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      constraints: const BoxConstraints(maxHeight: 260),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: _searching
+          ? const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : _searchResults.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(child: Text('无匹配卡片')),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: _searchResults.length > 8 ? 8 : _searchResults.length,
+                  itemBuilder: (context, index) {
+                    final card = _searchResults[index];
+                    final highlighted = _selectedCard?.id == card.id;
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        '${index + 1}. ${card.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight:
+                              highlighted ? FontWeight.w700 : FontWeight.w500,
+                          color: highlighted
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                      ),
+                      subtitle: Text(
+                        card.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => _selectCard(card),
+                    );
+                  },
+                ),
+    );
+  }
+
   Widget _buildList() {
     if (_loadingQuizzes) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_quizzes.isEmpty) {
-      return const Center(child: Text('暂无 Quiz,选择卡片生成一份'));
+      return const Center(child: Text('暂无 Quiz,搜索卡片生成一份'));
     }
     return ListView.builder(
       itemCount: _quizzes.length,
@@ -196,9 +366,17 @@ class _QuizPageState extends ConsumerState<QuizPage> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: _StatusChip(
-                status: quiz.status,
-                graded: quiz.graded,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _StatusChip(status: quiz.status, graded: quiz.graded),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: '删除',
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: () => _deleteQuiz(quiz),
+                  ),
+                ],
               ),
               onTap: () => _openDetail(quiz),
             ),
